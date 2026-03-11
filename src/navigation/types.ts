@@ -4,6 +4,15 @@ export type AuthStackParamList = {
   OtpVerification: {
     mobile: string;
   };
+  TermsAndConditions: undefined;
+  PrivacyPolicy: undefined;
+};
+
+import type { GenerateKundaliPayload } from '../services/api/astroApi';
+
+export type OrderStackParamList = {
+  OrderList: { initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking' } | undefined;
+  ViewKundli: { name: string; id?: string; kundaliPayload?: GenerateKundaliPayload };
 };
 
 export type RootTabParamList = {

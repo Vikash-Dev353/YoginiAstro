@@ -3,6 +3,25 @@ import { authApi } from '../../services/api/authApi';
 import { setAccessToken } from '../../services/api/client';
 import { storage } from '../../utils/storage';
 
+export function decodeAstroIdFromToken(token: string | null): string | null {
+  if (!token || token.split('.').length < 2) return null;
+  const atobFn = (globalThis as { atob?: (s: string) => string }).atob;
+  if (typeof atobFn !== 'function') return null;
+  try {
+    const base64 = token.split('.')[1];
+    const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    const json = atobFn(padded);
+    const payload = JSON.parse(json) as { astroId?: string };
+    return payload.astroId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type User = {
   id: string;
   name: string;
@@ -12,6 +31,7 @@ type User = {
 type AuthState = {
   user: User | null;
   token: string | null;
+  astroId: string | null;
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   loading: boolean;
@@ -22,6 +42,7 @@ type AuthState = {
 const initialState: AuthState = {
   user: null,
   token: null,
+  astroId: null,
   isAuthenticated: false,
   isBootstrapping: true,
   loading: false,
@@ -29,10 +50,15 @@ const initialState: AuthState = {
   authEntryRoute: 'Login',
 };
 
-export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async () => {
-  const token = await storage.getAuthToken();
-  return token;
-});
+export const bootstrapAuth = createAsyncThunk(
+  'auth/bootstrap',
+  async (): Promise<{ token: string | null; astroId: string | null }> => {
+    const token = await storage.getAuthToken();
+    if (!token) return { token: null, astroId: null };
+    const astroId = decodeAstroIdFromToken(token);
+    return { token, astroId };
+  },
+);
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -112,9 +138,18 @@ const authSlice = createSlice({
     },
     setAuthenticatedSession: (
       state,
-      action: { payload: { token: string; user?: User } },
+      action: {
+        payload: { token: string; user?: User; astroId?: string | null };
+      },
     ) => {
-      state.token = action.payload.token;
+      const { token: tokenPayload, astroId: payloadAstroId } = action.payload;
+      state.token = tokenPayload;
+      const fromPayload =
+        typeof payloadAstroId === 'string' && payloadAstroId.trim().length > 0
+          ? payloadAstroId.trim()
+          : null;
+      state.astroId =
+        fromPayload ?? decodeAstroIdFromToken(tokenPayload) ?? null;
       state.user =
         action.payload.user ||
         ({
@@ -131,13 +166,16 @@ const authSlice = createSlice({
   extraReducers: builder => {
     builder
       .addCase(bootstrapAuth.fulfilled, (state, action) => {
-        state.token = action.payload;
-        state.isAuthenticated = Boolean(action.payload);
+        const payload = action.payload;
+        state.token = payload.token;
+        state.astroId = payload.astroId ?? null;
+        state.isAuthenticated = Boolean(payload.token);
         state.isBootstrapping = false;
-        setAccessToken(action.payload);
+        setAccessToken(payload.token);
       })
       .addCase(bootstrapAuth.rejected, state => {
         state.isBootstrapping = false;
+        state.astroId = null;
         setAccessToken(null);
       })
       .addCase(login.pending, state => {
@@ -148,6 +186,9 @@ const authSlice = createSlice({
         state.loading = false;
         state.token = action.payload.token;
         state.user = action.payload.user;
+        state.astroId =
+          (action.payload as { astroId?: string }).astroId ??
+          decodeAstroIdFromToken(action.payload.token);
         state.isAuthenticated = true;
         state.authEntryRoute = 'Login';
         setAccessToken(action.payload.token);
@@ -199,6 +240,7 @@ const authSlice = createSlice({
       .addCase(logout.fulfilled, state => {
         state.user = null;
         state.token = null;
+        state.astroId = null;
         state.isAuthenticated = false;
         setAccessToken(null);
       });

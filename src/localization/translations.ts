@@ -88,6 +88,7 @@ export const translations = {
       rate: 'Rate',
       duration: 'Duration',
       amount: 'Amount',
+      refund: 'Refund',
     },
   },
   hi: {
@@ -177,6 +178,7 @@ export const translations = {
       rate: 'रेट',
       duration: 'समय',
       amount: 'राशि',
+      refund: 'रिफंड',
     },
   },
 } as const;
@@ -256,7 +258,8 @@ export type TranslationKey =
   | 'order.total'
   | 'order.rate'
   | 'order.duration'
-  | 'order.amount';
+  | 'order.amount'
+  | 'order.refund';
 
 export const translate = (language: AppLanguage, key: TranslationKey) => {
   const [section, leaf] = key.split('.') as [keyof typeof translations.en, string];

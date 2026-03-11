@@ -9,7 +9,7 @@ import { colors } from '../constants/colors';
 import { useTranslation } from '../localization/useTranslation';
 import { HomeScreen } from '../screens/main/HomeScreen';
 import { NotificationScreen } from '../screens/main/NotificationScreen';
-import { OrderScreen } from '../screens/main/OrderScreen';
+import { OrderStackNavigator } from './OrderStackNavigator';
 import { WalletScreen } from '../screens/main/WalletScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { RootTabParamList } from './types';
@@ -85,7 +85,7 @@ export function MainTabNavigator() {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Order" component={OrderScreen} />
+      <Tab.Screen name="Order" component={OrderStackNavigator} />
       <Tab.Screen name="Wallet" component={WalletScreen} />
       <Tab.Screen name="Notification" component={NotificationScreen} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />

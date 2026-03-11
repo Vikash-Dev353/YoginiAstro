@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 let accessToken: string | null = null;
 
@@ -6,15 +6,15 @@ export const setAccessToken = (token: string | null) => {
   accessToken = token;
 };
 
-const BASE_URL = 'https://yoginiastro.com/api/mob';
+const BASE_URL = "https://yoginiastro.com/api/mob";
 const ENABLE_API_LOGS = true;
 
 const getFullUrl = (config?: AxiosRequestConfig) => {
   if (!config) {
-    return '';
+    return "";
   }
 
-  return `${config.baseURL || ''}${config.url || ''}`;
+  return `${config.baseURL || ""}${config.url || ""}`;
 };
 
 const logApiRequest = (config: AxiosRequestConfig) => {
@@ -22,7 +22,7 @@ const logApiRequest = (config: AxiosRequestConfig) => {
     return;
   }
 
-  console.log('API REQUEST', {
+  console.log("API REQUEST", {
     method: config.method?.toUpperCase(),
     url: getFullUrl(config),
     params: config.params,
@@ -35,12 +35,18 @@ const logApiResponse = (response: AxiosResponse) => {
     return;
   }
 
-  console.log('API RESPONSE', {
+  console.log("API RESPONSE", {
     method: response.config.method?.toUpperCase(),
     url: getFullUrl(response.config),
     status: response.status,
     data: response.data,
   });
+
+  console.log("api response string==>>>",JSON.stringify({
+    data: response.data,
+  }) );
+
+
 };
 
 const logApiError = (error: AxiosError<{ message?: string }>) => {
@@ -48,7 +54,7 @@ const logApiError = (error: AxiosError<{ message?: string }>) => {
     return;
   }
 
-  console.log('API ERROR', {
+  console.log("API ERROR", {
     method: error.config?.method?.toUpperCase(),
     url: getFullUrl(error.config),
     status: error.response?.status,
@@ -61,12 +67,12 @@ export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
   headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
 
-apiClient.interceptors.request.use(config => {
+apiClient.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -86,14 +92,14 @@ apiClient.interceptors.response.use(
     const message =
       error.response?.data?.message ||
       error.message ||
-      'Something went wrong. Please try again.';
+      "Something went wrong. Please try again.";
 
     return Promise.reject({
       status: error.response?.status,
       message,
       raw: error,
     });
-  },
+  }
 );
 
 export const apiService = {
@@ -112,7 +118,7 @@ export const apiService = {
   patch: async <T>(
     url: string,
     body?: unknown,
-    config?: AxiosRequestConfig,
+    config?: AxiosRequestConfig
   ) => {
     const response = await apiClient.patch<T>(url, body, config);
     return response.data;

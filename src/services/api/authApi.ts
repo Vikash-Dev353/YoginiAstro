@@ -39,6 +39,9 @@ export type VerifyOtpResponse = {
   message?: string;
   status: 'Success' | 'Failed' | string;
   token?: string;
+  /** JWT – backend may send token in this field */
+  authorization?: string;
+  astroId?: string;
   user?: {
     id?: string;
     name?: string;

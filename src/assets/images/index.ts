@@ -1,5 +1,6 @@
 export const images = {
   logo: require('./logo.png'),
+  loaderGif: require('./logo-animated.gif'),
   chevronRight: require('./chevron-right.png'),
   call: require('./call.png'),
   chatBubble: require('./chatbubble-ellipses-sharp.png'),
@@ -19,4 +20,5 @@ export const images = {
   walletSharp: require('./wallet-sharp.png'),
   settings: require('./settings.png'),
   iconamoonProfileCircleFill: require('./iconamoon_profile-circle-fill.png'),
+  timerOutline: require('./timer-outline.png'),
 } as const;

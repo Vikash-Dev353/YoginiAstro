@@ -70,6 +70,14 @@ function LoginScreenComponent({ navigation }: Props) {
     navigation.navigate('Signup');
   }, [navigation]);
 
+  const onTermsPress = useCallback(() => {
+    navigation.navigate('TermsAndConditions');
+  }, [navigation]);
+
+  const onPrivacyPress = useCallback(() => {
+    navigation.navigate('PrivacyPolicy');
+  }, [navigation]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -108,9 +116,13 @@ function LoginScreenComponent({ navigation }: Props) {
 
             <Text style={styles.termsText}>
               {`${t('auth.termsPrefix')} `}
-              <Text style={styles.termsLink}>{t('auth.termsOfUse')}</Text>{' '}
-              {t('common.and')}{' '}
-              <Text style={styles.termsLink}>{t('auth.privacyPolicy')}</Text>
+              <Text style={styles.termsLink} onPress={onTermsPress}>
+                {t('auth.termsOfUse')}
+              </Text>
+              {` ${t('common.and')} `}
+              <Text style={styles.termsLink} onPress={onPrivacyPress}>
+                {t('auth.privacyPolicy')}
+              </Text>
             </Text>
           </View>
 

@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import {
   Alert,
   Image,
@@ -12,17 +12,17 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { images } from '../../assets/images';
-import { AppButton } from '../../components/common/AppButton';
-import { colors } from '../../constants/colors';
-import { useTranslation } from '../../localization/useTranslation';
-import { AppLanguage } from '../../localization/translations';
-import { RootTabParamList } from '../../navigation/types';
-import { astroApi } from '../../services/api/astroApi';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { changeAppLanguage } from '../../store/slices/languageSlice';
-import { hp, normalizeFont, wp } from '../../utils/responsive';
+} from "react-native";
+import { images } from "../../assets/images";
+import { AppButton } from "../../components/common/AppButton";
+import { colors } from "../../constants/colors";
+import { useTranslation } from "../../localization/useTranslation";
+import { AppLanguage } from "../../localization/translations";
+import { RootTabParamList } from "../../navigation/types";
+import { astroApi } from "../../services/api/astroApi";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { changeAppLanguage } from "../../store/slices/languageSlice";
+import { hp, normalizeFont, wp } from "../../utils/responsive";
 
 type ActionItem = {
   key: string;
@@ -31,78 +31,78 @@ type ActionItem = {
   image?: number;
 };
 
-type Props = BottomTabScreenProps<RootTabParamList, 'Home'>;
+type Props = BottomTabScreenProps<RootTabParamList, "Home">;
 
 function HomeScreenComponent({ navigation }: Props) {
   const dispatch = useAppDispatch();
   const { t, appLanguage } = useTranslation();
-  const token = useAppSelector(state => state.auth.token);
-  const ASTRO_ID = 'AS1031';
+  const token = useAppSelector((state) => state.auth.token);
+  const astroId =
+    useAppSelector((state) => state.auth.astroId)?.trim()?.toUpperCase() ||
+    "AS1031";
 
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [chatEnabled, setChatEnabled] = useState(false);
   const [isStatusSyncing, setIsStatusSyncing] = useState(false);
-  const [astroName, setAstroName] = useState('Shrimaan');
-  const [astroMobile, setAstroMobile] = useState('7275215936');
+  const [astroName, setAstroName] = useState("Shrimaan");
+  const [astroMobile, setAstroMobile] = useState("7275215936");
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [selectedLanguage, setSelectedLanguage] =
     useState<AppLanguage>(appLanguage);
 
-  console.log('isLanguageModalVisible==>>>', isLanguageModalVisible);
-
   const actions = useMemo<ActionItem[]>(
     () => [
-      { key: 'call', label: t('home.call'), icon: 'C', image: images.call },
+      { key: "call", label: t("home.call"), icon: "C", image: images.call },
       {
-        key: 'chat',
-        label: t('common.chat'),
-        icon: 'M',
+        key: "chat",
+        label: t("common.chat"),
+        icon: "M",
         image: images.chatBubble,
       },
       {
-        key: 'waitlist',
-        label: t('home.waitlist'),
-        icon: 'W',
+        key: "waitlist",
+        label: t("home.waitlist"),
+        icon: "W",
         image: images.taskList,
       },
       {
-        key: 'go-live',
-        label: t('common.goLiveNow'),
-        icon: 'L',
+        key: "go-live",
+        label: t("common.goLiveNow"),
+        icon: "L",
         image: images.videoCameraVintage,
       },
       {
-        key: 'support',
-        label: t('home.support'),
-        icon: 'S',
+        key: "support",
+        label: t("home.support"),
+        icon: "S",
         image: images.streamlineCustomerSupportSolid,
       },
       {
-        key: 'reviews',
-        label: t('home.myReviews'),
-        icon: 'R',
+        key: "reviews",
+        label: t("home.myReviews"),
+        icon: "R",
         image: images.star,
       },
       {
-        key: 'wallet',
-        label: t('common.wallet'),
-        icon: 'W',
+        key: "wallet",
+        label: t("common.wallet"),
+        icon: "W",
         image: images.walletSharp,
       },
       {
-        key: 'setting',
-        label: t('common.setting'),
-        icon: 'S',
+        key: "setting",
+        label: t("common.setting"),
+        icon: "S",
         image: images.settings,
       },
       {
-        key: 'profile',
-        label: t('common.profile'),
-        icon: 'P',
+        key: "profile",
+        label: t("common.profile"),
+        icon: "P",
         image: images.iconamoonProfileCircleFill,
       },
     ],
-    [t],
+    [t]
   );
 
   const openLanguageModal = () => {
@@ -118,16 +118,16 @@ function HomeScreenComponent({ navigation }: Props) {
   const loadOnlineStatus = useCallback(async () => {
     try {
       setIsStatusSyncing(true);
-      const response = await astroApi.getOnline({ astroId: ASTRO_ID });
+      const response = await astroApi.getOnline({ astroId });
 
       const callOnline =
-        (response?.astrologer?.callStatus.toLowerCase() === 'online' ||
+        ((response.astrologer?.callStatus ?? "").toLowerCase() === "online" ||
           response.callOnline) ??
         response.data?.callOnline ??
         false;
 
       const chatOnline =
-        (response.astrologer?.chatStatus?.toLowerCase() === 'online' ||
+        ((response.astrologer?.chatStatus ?? "").toLowerCase() === "online" ||
           response.chatOnline) ??
         response.data?.chatOnline ??
         false;
@@ -141,11 +141,11 @@ function HomeScreenComponent({ navigation }: Props) {
         setAstroMobile(response.astrologer.mobile);
       }
     } catch (error) {
-      console.log('GET ONLINE STATUS ERROR', error);
+      console.log("GET ONLINE STATUS ERROR", error);
     } finally {
       setIsStatusSyncing(false);
     }
-  }, [ASTRO_ID]);
+  }, [astroId]);
 
   useEffect(() => {
     if (!token) {
@@ -159,18 +159,18 @@ function HomeScreenComponent({ navigation }: Props) {
       try {
         setIsStatusSyncing(true);
         await astroApi.setOnline({
-          astroId: ASTRO_ID,
+          astroId,
           callOnline: nextCallOnline,
           chatOnline: nextChatOnline,
         });
       } catch (error) {
-        Alert.alert('Error', 'Unable to update online status.');
+        Alert.alert("Error", "Unable to update online status.");
         throw error;
       } finally {
         setIsStatusSyncing(false);
       }
     },
-    [ASTRO_ID],
+    [astroId]
   );
 
   const onVoiceToggle = (nextValue: boolean) => {
@@ -196,18 +196,24 @@ function HomeScreenComponent({ navigation }: Props) {
   };
 
   const onActionPress = (key: string) => {
-    if (key === 'call') {
-      navigation.navigate('Order', { initialTab: 'Voice Call' });
+    if (key === "call") {
+      navigation.navigate("Order", { initialTab: "Voice Call" });
       return;
     }
 
-    if (key === 'chat') {
-      navigation.navigate('Order', { initialTab: 'Chat' });
+    if (key === "chat") {
+      navigation.navigate("Order", { initialTab: "Chat" });
       return;
     }
 
-    if (key === 'waitlist') {
-      navigation.navigate('Order', { initialTab: 'Waitlist' });
+    if (key === "waitlist") {
+      navigation.navigate("Order", { initialTab: "Waitlist" });
+      return;
+    }
+
+    if (key === "wallet") {
+      navigation.navigate("Wallet");
+      return;
     }
   };
 
@@ -250,36 +256,36 @@ function HomeScreenComponent({ navigation }: Props) {
       >
         <View style={styles.statusCard}>
           <View>
-            <Text style={styles.cardTitle}>{t('home.voiceCall')}</Text>
-            <Text style={styles.rateText}>{t('home.ratePerMin')}</Text>
+            <Text style={styles.cardTitle}>{t("home.voiceCall")}</Text>
+            <Text style={styles.rateText}>{t("home.ratePerMin")}</Text>
           </View>
           <View style={styles.switchBlock}>
             <Switch
               value={voiceEnabled}
               onValueChange={onVoiceToggle}
-              trackColor={{ false: '#D69790', true: '#63B821' }}
+              trackColor={{ false: "#D69790", true: "#63B821" }}
               disabled={isStatusSyncing}
             />
             <Text style={styles.modeText}>
-              {voiceEnabled ? t('common.online') : t('common.offline')}
+              {voiceEnabled ? t("common.online") : t("common.offline")}
             </Text>
           </View>
         </View>
 
         <View style={styles.statusCard}>
           <View>
-            <Text style={styles.cardTitle}>{t('common.chat')}</Text>
-            <Text style={styles.rateText}>{t('home.ratePerMin')}</Text>
+            <Text style={styles.cardTitle}>{t("common.chat")}</Text>
+            <Text style={styles.rateText}>{t("home.ratePerMin")}</Text>
           </View>
           <View style={styles.switchBlock}>
             <Switch
               value={chatEnabled}
               onValueChange={onChatToggle}
-              trackColor={{ false: '#D69790', true: '#63B821' }}
+              trackColor={{ false: "#D69790", true: "#63B821" }}
               disabled={isStatusSyncing}
             />
             <Text style={styles.modeText}>
-              {chatEnabled ? t('common.online') : t('common.offline')}
+              {chatEnabled ? t("common.online") : t("common.offline")}
             </Text>
           </View>
         </View>
@@ -288,9 +294,9 @@ function HomeScreenComponent({ navigation }: Props) {
           <View style={styles.earningRow}>
             <View>
               <Text style={styles.earningTitle}>
-                {t('home.decemberEarning')}
+                {t("home.decemberEarning")}
               </Text>
-              <Text style={styles.invoiceText}>{t('home.invoiceAck')}</Text>
+              <Text style={styles.invoiceText}>{t("home.invoiceAck")}</Text>
             </View>
             <Pressable style={styles.arrowButton}>
               {/* <Text style={styles.arrowText}>{'>'}</Text> */}
@@ -303,13 +309,13 @@ function HomeScreenComponent({ navigation }: Props) {
           </View>
           <View style={styles.earningFooter}>
             <Text style={styles.earningFooterText}>
-              {t('home.invoiceHint')}
+              {t("home.invoiceHint")}
             </Text>
           </View>
         </View>
 
         <View style={styles.grid}>
-          {actions.map(item => (
+          {actions.map((item) => (
             <Pressable
               key={item.key}
               style={styles.gridItem}
@@ -346,37 +352,37 @@ function HomeScreenComponent({ navigation }: Props) {
             onPress={() => setLanguageModalVisible(false)}
           />
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{t('languageModal.title')}</Text>
+            <Text style={styles.modalTitle}>{t("languageModal.title")}</Text>
 
             <View style={styles.languageOptionsRow}>
               <Pressable
                 style={[
                   styles.languageOption,
-                  selectedLanguage === 'en' && styles.languageOptionActive,
+                  selectedLanguage === "en" && styles.languageOptionActive,
                 ]}
-                onPress={() => setSelectedLanguage('en')}
+                onPress={() => setSelectedLanguage("en")}
               >
                 <Text style={styles.languageOptionText}>
-                  {t('languageModal.english')}
+                  {t("languageModal.english")}
                 </Text>
               </Pressable>
 
               <Pressable
                 style={[
                   styles.languageOption,
-                  selectedLanguage === 'hi' && styles.languageOptionActive,
+                  selectedLanguage === "hi" && styles.languageOptionActive,
                 ]}
-                onPress={() => setSelectedLanguage('hi')}
+                onPress={() => setSelectedLanguage("hi")}
               >
                 <Text style={styles.languageOptionText}>
-                  {t('languageModal.hindi')}
+                  {t("languageModal.hindi")}
                 </Text>
               </Pressable>
             </View>
 
-            <Text style={styles.languageNote}>{t('languageModal.note')}</Text>
+            <Text style={styles.languageNote}>{t("languageModal.note")}</Text>
             <AppButton
-              title={t('common.apply')}
+              title={t("common.apply")}
               onPress={onApplyLanguage}
               containerStyle={styles.applyButton}
             />
@@ -396,23 +402,23 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 56,
-    backgroundColor: '#5A1919',
+    backgroundColor: "#5A1919",
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   nameText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: normalizeFont(28 / 2),
-    fontWeight: '700',
+    fontWeight: "700",
   },
   idText: {
-    color: '#F3D6D6',
+    color: "#F3D6D6",
     fontSize: normalizeFont(12),
   },
   headerDots: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 7,
   },
   scrollContent: {
@@ -422,110 +428,110 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#ECE8E8',
+    borderColor: "#ECE8E8",
     padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 14,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
   cardTitle: {
-    color: '#2F1E1E',
+    color: "#2F1E1E",
     fontSize: normalizeFont(16),
-    fontWeight: '600',
+    fontWeight: "600",
   },
   rateText: {
     marginTop: 2,
-    color: '#2F1E1E',
+    color: "#2F1E1E",
     fontSize: normalizeFont(12),
   },
   switchBlock: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 6,
   },
   modeText: {
-    color: '#2F1E1E',
+    color: "#2F1E1E",
     fontSize: normalizeFont(15 / 1.1),
   },
   earningCard: {
     marginTop: 6,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#8C4141',
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    borderColor: "#8C4141",
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
     marginBottom: 16,
   },
   earningRow: {
     paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   earningTitle: {
-    color: '#2E1A1A',
+    color: "#2E1A1A",
     fontSize: normalizeFont(17),
-    fontWeight: '700',
+    fontWeight: "700",
   },
   invoiceText: {
     marginTop: 3,
-    color: '#D48686',
+    color: "#D48686",
     fontSize: normalizeFont(13),
   },
   arrowButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#712424',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#712424",
+    alignItems: "center",
+    justifyContent: "center",
   },
   arrowText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: normalizeFont(20),
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: -1,
   },
   earningFooter: {
     minHeight: 34,
-    backgroundColor: '#5E1717',
-    justifyContent: 'center',
+    backgroundColor: "#5E1717",
+    justifyContent: "center",
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   earningFooterText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: normalizeFont(13),
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     rowGap: 18,
   },
   gridItem: {
-    width: '31%',
-    alignItems: 'center',
+    width: "31%",
+    alignItems: "center",
   },
   gridIconWrap: {
     width: 94,
     height: 94,
     borderRadius: 47,
     borderWidth: 1,
-    borderColor: '#D9D6D6',
-    backgroundColor: '#FDFDFD',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    borderColor: "#D9D6D6",
+    backgroundColor: "#FDFDFD",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOpacity: 0.07,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
@@ -536,57 +542,57 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     borderWidth: 2,
-    borderColor: '#6D3F3F',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#6D3F3F",
+    alignItems: "center",
+    justifyContent: "center",
   },
   gridIconText: {
-    color: '#6D3F3F',
+    color: "#6D3F3F",
     fontSize: normalizeFont(22),
-    fontWeight: '700',
+    fontWeight: "700",
   },
   gridIconImage: {
     width: 26,
     height: 26,
-    tintColor: '#6D3F3F',
+    tintColor: "#6D3F3F",
   },
   headerIconImage: {
     width: 26,
     height: 26,
-    tintColor: '#ffffff',
+    tintColor: "#ffffff",
   },
   gridLabel: {
     marginTop: 8,
-    textAlign: 'center',
-    color: '#2E1C1C',
+    textAlign: "center",
+    color: "#2E1C1C",
     fontSize: normalizeFont(16 / 1.1),
-    fontWeight: '500',
+    fontWeight: "500",
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 18,
   },
   modalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 380,
     borderRadius: 26,
-    backgroundColor: '#FFF7F4',
+    backgroundColor: "#FFF7F4",
     paddingHorizontal: 22,
     paddingVertical: 26,
   },
   modalTitle: {
-    textAlign: 'center',
-    color: '#CF897E',
+    textAlign: "center",
+    color: "#CF897E",
     fontSize: normalizeFont(32 / 1.8),
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 20,
   },
   languageOptionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 20,
   },
   languageOption: {
@@ -594,26 +600,26 @@ const styles = StyleSheet.create({
     minHeight: 88,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#5A1B1B',
-    backgroundColor: '#6A2727',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#5A1B1B",
+    backgroundColor: "#6A2727",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
   },
   languageOptionActive: {
-    backgroundColor: '#4C1818',
+    backgroundColor: "#4C1818",
   },
   languageOptionText: {
-    textAlign: 'center',
-    color: '#FFFFFF',
+    textAlign: "center",
+    color: "#FFFFFF",
     fontSize: normalizeFont(16 / 1.15),
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 28,
   },
   languageNote: {
     marginTop: 18,
-    textAlign: 'center',
-    color: '#5D4545',
+    textAlign: "center",
+    color: "#5D4545",
     fontSize: normalizeFont(14 / 1.1),
   },
   applyButton: {

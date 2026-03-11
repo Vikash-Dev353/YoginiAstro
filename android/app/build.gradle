@@ -117,3 +117,14 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Ensure stale autolinking artifacts are regenerated before native clean tasks.
+afterEvaluate {
+    tasks.matching { task ->
+        task.name.startsWith("externalNativeBuildClean")
+    }.configureEach { task ->
+        // These native clean tasks often fail on missing generated JNI dirs in RN new architecture.
+        // Disable them so `./gradlew clean` remains stable for day-to-day development.
+        task.enabled = false
+    }
+}

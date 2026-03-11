@@ -1,0 +1,31 @@
+{
+  "balance": {
+    "totalAvailable": 19300,
+    "currency": "INR",
+    "subtitle": "Available Balance"
+  },
+  "weeklyEarnings": {
+    "total": "₹1,550",
+    "chartData": [
+      { "value": 230, "label": "Mon" },
+      { "value": 280, "label": "Tue" },
+      { "value": 250, "label": "Wed" },
+      { "value": 270, "label": "Thu" },
+      { "value": 320, "label": "Fri" },
+      { "value": 340, "label": "Sat" },
+      { "value": 380, "label": "Sun" }
+    ]
+  },
+  "monthlyEarnings": [
+    { "id": "m1", "month": "January", "label": "January Earning", "amount": "₹850", "amountValue": 850 },
+    { "id": "m2", "month": "February", "label": "February Earning", "amount": "₹850", "amountValue": 850 },
+    { "id": "m3", "month": "March", "label": "March Earning", "amount": "₹1,250", "amountValue": 1250 },
+    { "id": "m4", "month": "April", "label": "April Earning", "amount": "₹920", "amountValue": 920 },
+    { "id": "m5", "month": "May", "label": "May Earning", "amount": "₹1,100", "amountValue": 1100 },
+    { "id": "m6", "month": "June", "label": "June Earning", "amount": "₹1,400", "amountValue": 1400 }
+  ],
+  "payableAmount": {
+    "amount": "₹4,300",
+    "amountValue": 4300
+  }
+}
