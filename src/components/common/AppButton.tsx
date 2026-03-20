@@ -62,6 +62,6 @@ const styles = StyleSheet.create({
   title: {
     color: colors.surface,
     fontSize: normalizeFont(18),
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
