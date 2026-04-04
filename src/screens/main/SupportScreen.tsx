@@ -104,7 +104,7 @@ const maroonText = '#3E2723';
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F9F7F4',
+    backgroundColor: 'transparent',
   },
   scroll: {
     paddingHorizontal: wp(6),

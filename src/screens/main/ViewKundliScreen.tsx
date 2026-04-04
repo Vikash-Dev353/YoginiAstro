@@ -571,7 +571,7 @@ export const ViewKundliScreen = memo(ViewKundliScreenComponent);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   tabBar: {
     flexDirection: "row",

@@ -1,4 +1,5 @@
 export const images = {
+  appBackground: require('./app-background.png'),
   logo: require('./logo.png'),
   loaderGif: require('./logo-animated.gif'),
   chevronRight: require('./chevron-right.png'),

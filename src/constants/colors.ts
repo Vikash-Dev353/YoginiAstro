@@ -1,7 +1,8 @@
 export const colors = {
   primary: '#5A1414',
   maroon: '#4A1111',
-  background: '#FAF8F7',
+  /** Screen chrome; global pattern comes from App `ImageBackground` */
+  background: 'transparent',
   surface: '#FFFFFF',
   textPrimary: '#211A1A',
   textSecondary: '#6B7280',
