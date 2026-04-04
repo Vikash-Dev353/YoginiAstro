@@ -4,14 +4,8 @@ import {
 } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import {
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppSelector } from "../../store/hooks";
 import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { AppHeader } from "../../components/common/AppHeader";
@@ -100,7 +94,7 @@ export function WalletScreen({ navigation }: Props) {
 
   if (loading && !walletData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
         <AppHeader
           title={t("common.wallet")}
           showBack
@@ -115,7 +109,7 @@ export function WalletScreen({ navigation }: Props) {
 
   if (showEmptyState) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
         <AppHeader
           title={t("common.wallet")}
           showBack
@@ -130,7 +124,7 @@ export function WalletScreen({ navigation }: Props) {
 
   if (error && !walletData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
         <AppHeader
           title={t("common.wallet")}
           showBack
@@ -152,7 +146,7 @@ export function WalletScreen({ navigation }: Props) {
   const payableAmount = walletData?.payableAmount?.amount ?? "₹0";
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <AppHeader
         title={t("common.wallet")}
         showBack

@@ -25,9 +25,7 @@ export function ProfileStackNavigator() {
       <Stack.Screen name="GoLiveNow">
         {props => <ProfileDetailScreen {...props} title={t('common.goLiveNow')} />}
       </Stack.Screen>
-      <Stack.Screen name="Review">
-        {props => <ReviewScreen {...props} />}
-      </Stack.Screen>
+      <Stack.Screen name="Review" component={ReviewScreen} />
       <Stack.Screen name="Setting" component={SettingScreen} />
     </Stack.Navigator>
   );

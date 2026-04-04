@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/common/AppButton';
 import { AppHeader } from '../../components/common/AppHeader';
 import { SettingListItem } from '../../components/profile/SettingListItem';
@@ -34,7 +35,7 @@ export function SettingScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <AppHeader title={t('common.setting')} showBack onBackPress={navigation.goBack} />
 
       <ScrollView

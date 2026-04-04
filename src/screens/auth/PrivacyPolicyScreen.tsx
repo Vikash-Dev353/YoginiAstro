@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { memo } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
@@ -13,7 +14,7 @@ function PrivacyPolicyScreenComponent({ navigation }: Props) {
   const { t } = useTranslation();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <AppHeader
         title={t('auth.privacyPolicy')}
         showBack

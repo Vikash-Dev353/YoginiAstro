@@ -1,4 +1,5 @@
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
@@ -7,7 +8,7 @@ export function NotificationScreen() {
   const { t } = useTranslation();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <AppHeader title={t('common.notification')} />
       <View style={styles.content}>
         <Text style={styles.title}>{t('common.notification')}</Text>

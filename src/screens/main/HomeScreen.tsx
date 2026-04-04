@@ -7,7 +7,6 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
 import { AppButton } from "../../components/common/AppButton";
 import { colors } from "../../constants/colors";
@@ -39,6 +39,7 @@ type Props = CompositeScreenProps<
 >;
 
 function HomeScreenComponent({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { t, appLanguage } = useTranslation();
   const token = useAppSelector((state) => state.auth.token);
@@ -247,8 +248,9 @@ function HomeScreenComponent({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
         <View>
           <Text style={styles.nameText}>{astroName}</Text>
           <Text style={styles.idText}>{`+91 ${astroMobile}`}</Text>
@@ -275,6 +277,7 @@ function HomeScreenComponent({ navigation }: Props) {
               resizeMode="contain"
             />
           </TouchableOpacity>
+        </View>
         </View>
       </View>
 
@@ -429,9 +432,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  headerWrap: {
+    backgroundColor: "#5A1919",
+  },
   header: {
     height: 56,
-    backgroundColor: "#5A1919",
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",

@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../constants/colors';
 import { normalizeFont } from '../../utils/responsive';
 import { images } from '../../assets/images';
@@ -14,31 +15,37 @@ export function AppHeader({
   showBack = false,
   onBackPress,
 }: AppHeaderProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.leftSlot}>
-        {showBack ? (
-          <Pressable
-            onPress={onBackPress}
-            hitSlop={12}
-            style={styles.backButton}
-          >
-            <Image source={images.leftArrow} resizeMode="contain" />
-          </Pressable>
-        ) : null}
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.bar}>
+        <View style={styles.leftSlot}>
+          {showBack ? (
+            <Pressable
+              onPress={onBackPress}
+              hitSlop={12}
+              style={styles.backButton}
+            >
+              <Image source={images.leftArrow} resizeMode="contain" />
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.title}>{title}</Text>
+        <View style={styles.rightSlot} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.rightSlot} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    height: 56,
+  root: {
+    backgroundColor: '#F7F5F4',
     borderBottomWidth: 1,
     borderBottomColor: '#D2D2D2',
-    backgroundColor: '#F7F5F4',
+  },
+  bar: {
+    minHeight: 56,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',

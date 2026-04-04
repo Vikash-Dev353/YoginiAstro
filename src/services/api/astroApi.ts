@@ -244,6 +244,28 @@ export type RecentAstroCallsResponse = {
   consultations: CallHistoryItem[];
 };
 
+export type LatestReviewApiItem = {
+  astroId?: string;
+  userId?: string;
+  userName?: string;
+  rating?: number;
+  review?: string;
+  date?: string;
+};
+
+export type GetLatestReviewsPayload = {
+  astroId: string;
+  limit?: number;
+};
+
+export type GetLatestReviewsResponse = {
+  status?: string;
+  message?: string;
+  totalReviews?: number;
+  averageRating?: string;
+  data?: LatestReviewApiItem[];
+};
+
 type WaitlistCacheEntry = {
   fetchedAt: number;
   data: WaitlistResponse;
@@ -313,5 +335,13 @@ export const astroApi = {
     apiService.post<GenerateKundaliResponse>(
       API_ROUTES.astrology.generateKundali,
       payload,
+    ),
+  getLatestReviews: (payload: GetLatestReviewsPayload) =>
+    apiService.post<GetLatestReviewsResponse>(
+      API_ROUTES.auth.getLatestReviews,
+      {
+        astroId: payload.astroId.trim().toUpperCase(),
+        limit: payload.limit ?? 20,
+      },
     ),
 };

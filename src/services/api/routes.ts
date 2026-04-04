@@ -6,6 +6,7 @@ export const API_ROUTES = {
     setOnline: "/astro/set-online",
     waitlist: (astroId: string) => `/astro/waitlist/${astroId}`,
     getMonthlyEarnings: "/astro/get-monthly-earnings",
+    getLatestReviews: "/astro/get-latest-reviews",
     recentConsultations: (astroId: string) =>
       `/astro/recent-consultations/${astroId}`,
     login: "/auth/login",

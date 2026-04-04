@@ -5,12 +5,12 @@ import {
   Image,
   Linking,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { images } from '../../assets/images';
 import { AppHeader } from '../../components/common/AppHeader';
 import { colors } from '../../constants/colors';
@@ -47,7 +47,7 @@ function SupportScreenComponent({ navigation }: SupportRouteProps) {
   }, [t]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <AppHeader
         title={t('common.customerSupport')}
         showBack

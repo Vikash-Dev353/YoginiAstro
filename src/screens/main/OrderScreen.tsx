@@ -5,11 +5,11 @@ import {
   FlatList,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
 import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { AppHeader } from "../../components/common/AppHeader";
@@ -564,7 +564,7 @@ export function OrderScreen({ route, navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <AppHeader title={t("common.order")} />
       <View style={styles.tabsRow}>
         {tabs.map((tab) => {

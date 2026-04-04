@@ -77,6 +77,16 @@ export const translations = {
       downloadForm: 'Download Form 16A',
       termConditions: 'Term & Conditions',
     },
+    reviewScreen: {
+      loading: 'Loading reviews...',
+      empty: 'No reviews yet.',
+      error: 'Could not load reviews.',
+      retry: 'Retry',
+      showMore: 'Show more',
+      showLess: 'Show less',
+      avgRating: 'Average rating',
+      guestUser: 'User',
+    },
     order: {
       waitlist: 'Waitlist',
       voiceCall: 'Voice Call',
@@ -174,6 +184,16 @@ export const translations = {
       downloadForm: 'फॉर्म 16A डाउनलोड करें',
       termConditions: 'नियम और शर्तें',
     },
+    reviewScreen: {
+      loading: 'रिव्यू लोड हो रहे हैं...',
+      empty: 'अभी कोई रिव्यू नहीं है।',
+      error: 'रिव्यू लोड नहीं हो सके।',
+      retry: 'फिर कोशिश करें',
+      showMore: 'और देखें',
+      showLess: 'कम देखें',
+      avgRating: 'औसत रेटिंग',
+      guestUser: 'यूज़र',
+    },
     order: {
       waitlist: 'वेटलिस्ट',
       voiceCall: 'वॉइस कॉल',
@@ -261,6 +281,14 @@ export type TranslationKey =
   | 'profile.paySlip'
   | 'profile.downloadForm'
   | 'profile.termConditions'
+  | 'reviewScreen.loading'
+  | 'reviewScreen.empty'
+  | 'reviewScreen.error'
+  | 'reviewScreen.retry'
+  | 'reviewScreen.showMore'
+  | 'reviewScreen.showLess'
+  | 'reviewScreen.avgRating'
+  | 'reviewScreen.guestUser'
   | 'order.waitlist'
   | 'order.voiceCall'
   | 'order.chat'

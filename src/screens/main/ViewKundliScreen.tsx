@@ -130,7 +130,7 @@ function ViewKundliScreenComponent({ route, navigation }: Props) {
   const bottomTabHeight = 84 + 10 + 16;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <AppHeader
         title={isHindi ? "कुंडली" : "Kundli"}
         showBack
