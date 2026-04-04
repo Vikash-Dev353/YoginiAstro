@@ -111,30 +111,32 @@ const DUMMY_WAITLIST: WaitlistItem[] = [
   },
 ];
 
-const POOJA_DATA: PoojaBookingItem[] = [
-  {
-    id: "p1",
-    orderId: "CHTI302",
-    serviceName: "Online Grah Pravesh Pooja",
-    customerName: "Raman Kumar",
-    customerPhone: "9354246782",
-    paymentMode: "UPI/Cash",
-    timeLabel: "11 Jan 2026 | 01:41 PM",
-    total: "₹ 2,100",
-    status: "Paid",
-  },
-  {
-    id: "p2",
-    orderId: "CHTI509",
-    serviceName: "Mangal Dosh Pooja",
-    customerName: "Riya Verma",
-    customerPhone: "9811122233",
-    paymentMode: "UPI",
-    timeLabel: "17 Jan 2026 | 07:20 PM",
-    total: "₹ 3,500",
-    status: "Paid",
-  },
-];
+// const POOJA_DATA: PoojaBookingItem[] = [
+//   {
+//     id: "p1",
+//     orderId: "CHTI302",
+//     serviceName: "Online Grah Pravesh Pooja",
+//     customerName: "Raman Kumar",
+//     customerPhone: "9354246782",
+//     paymentMode: "UPI/Cash",
+//     timeLabel: "11 Jan 2026 | 01:41 PM",
+//     total: "₹ 2,100",
+//     status: "Paid",
+//   },
+//   {
+//     id: "p2",
+//     orderId: "CHTI509",
+//     serviceName: "Mangal Dosh Pooja",
+//     customerName: "Riya Verma",
+//     customerPhone: "9811122233",
+//     paymentMode: "UPI",
+//     timeLabel: "17 Jan 2026 | 07:20 PM",
+//     total: "₹ 3,500",
+//     status: "Paid",
+//   },
+// ];
+
+const POOJA_DATA: PoojaBookingItem[] = []
 
 type Props = NativeStackScreenProps<OrderStackParamList, "OrderList">;
 

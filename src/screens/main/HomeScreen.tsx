@@ -258,7 +258,11 @@ function HomeScreenComponent({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+      <View style={{
+        backgroundColor:'#ffffff',
+        height:44,
+      }}></View>
+      <View style={[styles.headerWrap]}>
         <View style={styles.header}>
         <View>
           <Text style={styles.nameText}>{astroName}</Text>
