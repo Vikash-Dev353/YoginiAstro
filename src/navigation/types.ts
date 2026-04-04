@@ -1,3 +1,6 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { GenerateKundaliPayload } from '../services/api/astroApi';
+
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
@@ -8,21 +11,9 @@ export type AuthStackParamList = {
   PrivacyPolicy: undefined;
 };
 
-import type { GenerateKundaliPayload } from '../services/api/astroApi';
-
 export type OrderStackParamList = {
   OrderList: { initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking' } | undefined;
   ViewKundli: { name: string; id?: string; kundaliPayload?: GenerateKundaliPayload };
-};
-
-export type RootTabParamList = {
-  Home: undefined;
-  Order: {
-    initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking';
-  } | undefined;
-  Wallet: undefined;
-  Notification: undefined;
-  Profile: undefined;
 };
 
 export type ProfileStackParamList = {
@@ -33,4 +24,14 @@ export type ProfileStackParamList = {
   GoLiveNow: undefined;
   Review: undefined;
   Setting: undefined;
+};
+
+export type RootTabParamList = {
+  Home: undefined;
+  Order: {
+    initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking';
+  } | undefined;
+  Wallet: undefined;
+  Notification: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };

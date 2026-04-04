@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from './types';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { ProfileDetailScreen } from '../screens/profile/ProfileDetailScreen';
+import { ReviewScreen } from '../screens/profile/ReviewScreen';
 import { SettingScreen } from '../screens/profile/SettingScreen';
 import { useTranslation } from '../localization/useTranslation';
 
@@ -26,7 +27,7 @@ export function ProfileStackNavigator() {
         {props => <ProfileDetailScreen {...props} title={t('common.goLiveNow')} />}
       </Stack.Screen>
       <Stack.Screen name="Review">
-        {props => <ProfileDetailScreen {...props} title={t('common.review')} />}
+        {props => <ReviewScreen {...props} />}
       </Stack.Screen>
       <Stack.Screen name="Setting" component={SettingScreen} />
     </Stack.Navigator>

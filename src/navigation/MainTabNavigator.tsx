@@ -41,7 +41,16 @@ const CustomTabBar = memo(
               canPreventDefault: true,
             });
 
-            if (!isFocused && !event.defaultPrevented) {
+            if (event.defaultPrevented) {
+              return;
+            }
+
+            if (routeName === 'Profile') {
+              navigation.navigate('Profile', { screen: 'ProfileHome' });
+              return;
+            }
+
+            if (!isFocused) {
               navigation.navigate(route.name);
             }
           };

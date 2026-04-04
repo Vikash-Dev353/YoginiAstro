@@ -211,6 +211,21 @@ function HomeScreenComponent({ navigation }: Props) {
       return;
     }
 
+    if (key === "reviews") {
+      navigation.navigate("Profile", { screen: "Review" });
+      return;
+    }
+
+    if (key === "profile") {
+      navigation.navigate("Profile", { screen: "ProfileHome" });
+      return;
+    }
+
+    if (key === "setting") {
+      navigation.navigate("Profile", { screen: "Setting" });
+      return;
+    }
+
     if (key === "wallet") {
       navigation.navigate("Wallet");
       return;
