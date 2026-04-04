@@ -5,10 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
-import { AuthStackParamList } from '../../navigation/types';
+import { AuthStackParamList, ProfileStackParamList } from '../../navigation/types';
 import { hp, normalizeFont, wp } from '../../utils/responsive';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'PrivacyPolicy'>;
+type Props = NativeStackScreenProps<
+  AuthStackParamList & ProfileStackParamList,
+  'PrivacyPolicy'
+>;
 
 function PrivacyPolicyScreenComponent({ navigation }: Props) {
   const { t } = useTranslation();

@@ -23,10 +23,21 @@ export function SettingScreen({ navigation }: Props) {
     { key: 'download-form', title: t('profile.downloadForm'), iconLabel: 'D' },
     { key: 'tnc', title: t('profile.termConditions'), iconLabel: 'TC' },
     { key: 'privacy', title: t('auth.privacyPolicy'), iconLabel: 'PP' },
-  ];
+  ] as const;
 
-  const onItemPress = (title: string) => {
-    Alert.alert(title, 'Screen integration next step me add kar denge.');
+  const onItemPress = (key: (typeof settingItems)[number]['key']) => {
+    if (key === 'tnc') {
+      navigation.navigate('TermsAndConditions');
+      return;
+    }
+    if (key === 'privacy') {
+      navigation.navigate('PrivacyPolicy');
+      return;
+    }
+    Alert.alert(
+      settingItems.find(i => i.key === key)?.title ?? '',
+      'Screen integration next step me add kar denge.',
+    );
   };
 
   const onLogoutPress = () => {
@@ -50,7 +61,7 @@ export function SettingScreen({ navigation }: Props) {
             key={item.key}
             title={item.title}
             iconLabel={item.iconLabel}
-            onPress={() => onItemPress(item.title)}
+            onPress={() => onItemPress(item.key)}
           />
         ))}
       </ScrollView>

@@ -24,6 +24,8 @@ export type ProfileStackParamList = {
   GoLiveNow: undefined;
   Review: undefined;
   Setting: undefined;
+  TermsAndConditions: undefined;
+  PrivacyPolicy: undefined;
 };
 
 export type HomeStackParamList = {
