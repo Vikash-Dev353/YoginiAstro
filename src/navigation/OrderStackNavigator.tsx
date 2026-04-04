@@ -8,16 +8,15 @@ const Stack = createNativeStackNavigator<OrderStackParamList>();
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Order'>;
 
-export function OrderStackNavigator({ route }: Props) {
-  const initialTab = route.params?.initialTab;
-
+/**
+ * OrderList params (e.g. initialTab) are set via nested navigation from Home:
+ * navigate('Order', { screen: 'OrderList', params: { initialTab: 'Chat' } }).
+ * Do not use initialParams here — they only apply once and ignore later navigations.
+ */
+export function OrderStackNavigator(_props: Props) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen
-        name="OrderList"
-        component={OrderScreen}
-        initialParams={{ initialTab }}
-      />
+      <Stack.Screen name="OrderList" component={OrderScreen} />
       <Stack.Screen name="ViewKundli" component={ViewKundliScreen} />
     </Stack.Navigator>
   );

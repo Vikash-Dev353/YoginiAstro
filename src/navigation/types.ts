@@ -35,9 +35,7 @@ export type HomeStackParamList = {
 
 export type RootTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList> | undefined;
-  Order: {
-    initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking';
-  } | undefined;
+  Order: NavigatorScreenParams<OrderStackParamList> | undefined;
   Wallet: undefined;
   Notification: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList> | undefined;

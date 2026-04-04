@@ -203,17 +203,26 @@ function HomeScreenComponent({ navigation }: Props) {
 
   const onActionPress = (key: string) => {
     if (key === "call") {
-      navigation.navigate("Order", { initialTab: "Voice Call" });
+      navigation.navigate("Order", {
+        screen: "OrderList",
+        params: { initialTab: "Voice Call" },
+      });
       return;
     }
 
     if (key === "chat") {
-      navigation.navigate("Order", { initialTab: "Chat" });
+      navigation.navigate("Order", {
+        screen: "OrderList",
+        params: { initialTab: "Chat" },
+      });
       return;
     }
 
     if (key === "waitlist") {
-      navigation.navigate("Order", { initialTab: "Waitlist" });
+      navigation.navigate("Order", {
+        screen: "OrderList",
+        params: { initialTab: "Waitlist" },
+      });
       return;
     }
 
