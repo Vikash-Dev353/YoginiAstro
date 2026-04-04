@@ -26,8 +26,13 @@ export type ProfileStackParamList = {
   Setting: undefined;
 };
 
+export type HomeStackParamList = {
+  HomeMain: undefined;
+  Support: undefined;
+};
+
 export type RootTabParamList = {
-  Home: undefined;
+  Home: NavigatorScreenParams<HomeStackParamList> | undefined;
   Order: {
     initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking';
   } | undefined;

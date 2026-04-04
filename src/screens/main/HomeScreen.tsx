@@ -1,5 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { CompositeScreenProps } from "@react-navigation/native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   Alert,
   Image,
@@ -18,7 +20,7 @@ import { AppButton } from "../../components/common/AppButton";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { AppLanguage } from "../../localization/translations";
-import { RootTabParamList } from "../../navigation/types";
+import { HomeStackParamList, RootTabParamList } from "../../navigation/types";
 import { astroApi } from "../../services/api/astroApi";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { changeAppLanguage } from "../../store/slices/languageSlice";
@@ -31,7 +33,10 @@ type ActionItem = {
   image?: number;
 };
 
-type Props = BottomTabScreenProps<RootTabParamList, "Home">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<HomeStackParamList, "HomeMain">,
+  BottomTabScreenProps<RootTabParamList>
+>;
 
 function HomeScreenComponent({ navigation }: Props) {
   const dispatch = useAppDispatch();
@@ -230,6 +235,15 @@ function HomeScreenComponent({ navigation }: Props) {
       navigation.navigate("Wallet");
       return;
     }
+
+    if (key === "support") {
+      navigation.navigate("Support");
+      return;
+    }
+  };
+
+  const openSupport = () => {
+    navigation.navigate("Support");
   };
 
   return (
@@ -240,7 +254,7 @@ function HomeScreenComponent({ navigation }: Props) {
           <Text style={styles.idText}>{`+91 ${astroMobile}`}</Text>
         </View>
         <View style={styles.headerDots}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={openSupport}>
             <Image
               source={images.streamlineCustomerSupport}
               style={styles.headerIconImage}

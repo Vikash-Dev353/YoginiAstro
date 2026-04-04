@@ -4,6 +4,7 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { ProfileDetailScreen } from '../screens/profile/ProfileDetailScreen';
 import { ReviewScreen } from '../screens/profile/ReviewScreen';
 import { SettingScreen } from '../screens/profile/SettingScreen';
+import { SupportScreen } from '../screens/main/SupportScreen';
 import { useTranslation } from '../localization/useTranslation';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -20,9 +21,7 @@ export function ProfileStackNavigator() {
       <Stack.Screen name="ProfileWallet">
         {props => <ProfileDetailScreen {...props} title={t('common.wallet')} />}
       </Stack.Screen>
-      <Stack.Screen name="CustomerSupport">
-        {props => <ProfileDetailScreen {...props} title={t('common.customerSupport')} />}
-      </Stack.Screen>
+      <Stack.Screen name="CustomerSupport" component={SupportScreen} />
       <Stack.Screen name="GoLiveNow">
         {props => <ProfileDetailScreen {...props} title={t('common.goLiveNow')} />}
       </Stack.Screen>

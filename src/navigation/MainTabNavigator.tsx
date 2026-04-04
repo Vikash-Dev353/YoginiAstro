@@ -7,7 +7,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { images } from '../assets/images';
 import { colors } from '../constants/colors';
 import { useTranslation } from '../localization/useTranslation';
-import { HomeScreen } from '../screens/main/HomeScreen';
+import { HomeStackNavigator } from './HomeStackNavigator';
 import { NotificationScreen } from '../screens/main/NotificationScreen';
 import { OrderStackNavigator } from './OrderStackNavigator';
 import { WalletScreen } from '../screens/main/WalletScreen';
@@ -47,6 +47,11 @@ const CustomTabBar = memo(
 
             if (routeName === 'Profile') {
               navigation.navigate('Profile', { screen: 'ProfileHome' });
+              return;
+            }
+
+            if (routeName === 'Home') {
+              navigation.navigate('Home', { screen: 'HomeMain' });
               return;
             }
 
@@ -93,7 +98,7 @@ export function MainTabNavigator() {
         headerShown: false,
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeStackNavigator} />
       <Tab.Screen name="Order" component={OrderStackNavigator} />
       <Tab.Screen name="Wallet" component={WalletScreen} />
       <Tab.Screen name="Notification" component={NotificationScreen} />

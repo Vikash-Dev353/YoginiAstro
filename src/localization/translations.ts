@@ -42,6 +42,13 @@ export const translations = {
       support: 'Support',
       myReviews: 'My Reviews',
     },
+    support: {
+      headline: "We're here to help 24/7",
+      subheadline: 'feel free to contact us',
+      openFailedTitle: 'Unable to open',
+      dialerUnavailable: 'Phone dialer is not available on this device.',
+      mailUnavailable: 'No email app is available to send mail.',
+    },
     auth: {
       mobileNumber: 'Mobile Number',
       enterMobile: 'Enter Your Mobile Number',
@@ -132,6 +139,13 @@ export const translations = {
       support: 'सहायता',
       myReviews: 'मेरे रिव्यू',
     },
+    support: {
+      headline: 'हम 24/7 मदद के लिए यहाँ हैं',
+      subheadline: 'बेझिझक हमसे संपर्क करें',
+      openFailedTitle: 'खोला नहीं जा सका',
+      dialerUnavailable: 'इस डिवाइस पर फोन डायलर उपलब्ध नहीं है।',
+      mailUnavailable: 'ईमेल भेजने के लिए कोई ऐप उपलब्ध नहीं है।',
+    },
     auth: {
       mobileNumber: 'मोबाइल नंबर',
       enterMobile: 'अपना मोबाइल नंबर दर्ज करें',
@@ -218,6 +232,11 @@ export type TranslationKey =
   | 'home.waitlist'
   | 'home.support'
   | 'home.myReviews'
+  | 'support.headline'
+  | 'support.subheadline'
+  | 'support.openFailedTitle'
+  | 'support.dialerUnavailable'
+  | 'support.mailUnavailable'
   | 'auth.mobileNumber'
   | 'auth.enterMobile'
   | 'auth.getOtp'
