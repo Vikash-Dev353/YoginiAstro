@@ -93,7 +93,7 @@ function LoginScreenComponent({ navigation }: Props) {
             <View style={styles.logoSection}>
               <Image
                 source={images.logo}
-                // style={styles.headerIconImage}
+                style={styles.headerIconImage}
                 resizeMode="contain"
               />
             </View>
@@ -157,6 +157,10 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  headerIconImage:{
+    width:250,
+    height:250, 
   },
   scrollContent: {
     flexGrow: 1,
