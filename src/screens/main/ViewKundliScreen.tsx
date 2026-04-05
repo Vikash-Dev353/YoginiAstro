@@ -19,6 +19,7 @@ import {
   astroApi,
   type BasicAstroDetailsData,
   type GenerateKundaliResponse,
+  type HoroscopeChartItem,
 } from "../../services/api/astroApi";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
 
@@ -80,6 +81,93 @@ function getBasicData(
 ): BasicAstroDetailsData | null {
   return kundaliData?.basic_astro_details?.data ?? null;
 }
+
+/** generate-kundali returns `horoscope_chart_D1` etc. on the response root (not under `.data`). */
+function getHoroscopeChartItem(
+  res: GenerateKundaliResponse | null,
+  key: keyof GenerateKundaliResponse
+): HoroscopeChartItem | undefined {
+  if (!res) {
+    return undefined;
+  }
+  const raw = res[key];
+  if (raw && typeof raw === "object" && "data" in raw) {
+    return raw as HoroscopeChartItem;
+  }
+  return undefined;
+}
+
+function extractChartSvgAndBase64(item: HoroscopeChartItem | undefined): {
+  svg?: string;
+  base64?: string;
+} {
+  if (!item?.data) {
+    return {};
+  }
+  const d = item.data;
+  let svg =
+    typeof d.svg === "string" && d.svg.trim().length > 0 ? d.svg : undefined;
+  let base64 =
+    typeof d.base64_image === "string" && d.base64_image.trim().length > 0
+      ? d.base64_image.trim()
+      : undefined;
+
+  if (!svg && d.data && typeof d.data === "object") {
+    const inner = d.data as Record<string, unknown>;
+    if (typeof inner.svg === "string" && inner.svg.trim().length > 0) {
+      svg = inner.svg;
+    }
+    if (
+      !base64 &&
+      typeof inner.base64_image === "string" &&
+      inner.base64_image.trim().length > 0
+    ) {
+      base64 = inner.base64_image.trim();
+    }
+  }
+
+  return { svg, base64 };
+}
+
+function base64ToImageSrc(raw: string): string {
+  const s = raw.trim();
+  if (
+    s.startsWith("data:") ||
+    s.startsWith("http://") ||
+    s.startsWith("https://")
+  ) {
+    return s;
+  }
+  return `data:image/png;base64,${s}`;
+}
+
+function buildKundliChartHtml(svg?: string, base64?: string): string {
+  const viewport =
+    '<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>';
+  const noScrollCss = `html,body{overflow:hidden!important;margin:0!important;padding:0!important;width:100%!important;height:100%!important;-webkit-overflow-scrolling:auto;touch-action:manipulation;}body{display:flex;align-items:center;justify-content:center;background:#F5F5F5;box-sizing:border-box;}img,svg{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;object-fit:contain;display:block;}`;
+  if (base64) {
+    const src = base64ToImageSrc(base64).replace(/"/g, "&quot;");
+    return `<!DOCTYPE html><html><head>${viewport}<style>${noScrollCss}</style></head><body><img src="${src}" alt="" /></body></html>`;
+  }
+  if (svg) {
+    const safe = svg.replace(/<\/script/gi, "<\\/script");
+    return `<!DOCTYPE html><html><head>${viewport}<style>${noScrollCss}</style></head><body>${safe}</body></html>`;
+  }
+  return "";
+}
+
+const HOROSCOPE_CHART_KEYS: {
+  key: keyof GenerateKundaliResponse;
+  label: string;
+}[] = [
+  { key: "horoscope_chart_D1", label: "D1" },
+  { key: "horoscope_chart_D2", label: "D2" },
+  { key: "horoscope_chart_D3", label: "D3" },
+  { key: "horoscope_chart_D9", label: "D9" },
+  { key: "horoscope_chart_D10", label: "D10" },
+  { key: "horoscope_chart_D12", label: "D12" },
+  { key: "horoscope_chart_chalit", label: "Chalit" },
+];
 
 function ViewKundliScreenComponent({ route, navigation }: Props) {
   const { name, kundaliPayload } = route.params;
@@ -385,39 +473,35 @@ function ViewKundliScreenComponent({ route, navigation }: Props) {
 
         {activeTab === "chart" && (
           <View style={styles.chartSection}>
-            {[
-              { key: 'horoscope_chart_D1', label: 'D1' },
-              { key: 'horoscope_chart_D2', label: 'D2' },
-              { key: 'horoscope_chart_D3', label: 'D3' },
-              { key: 'horoscope_chart_D9', label: 'D9' },
-              { key: 'horoscope_chart_D10', label: 'D10' },
-              { key: 'horoscope_chart_D12', label: 'D12' },
-            ].map(({ key, label }) => {
-              const chartData = kundaliData?.data?.[key as keyof typeof kundaliData.data] as { data?: { base64_image?: string; svg?: string } } | undefined;
-              const base64 = chartData?.data?.base64_image;
-              const svg = chartData?.data?.svg;
-              const hasChart = base64 || svg;
-              const html = base64
-                ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"/></head><body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;background:#F5F5F5"><img src="${base64}" style="width:100%;height:auto;max-width:360px;display:block" /></body></html>`
-                : svg
-                  ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"/></head><body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;background:#F5F5F5"><div style="width:100%;max-width:360px">${svg}</div></body></html>`
-                  : '';
+            {HOROSCOPE_CHART_KEYS.map(({ key, label }) => {
+              const chartItem = getHoroscopeChartItem(kundaliData, key);
+              const { svg, base64 } = extractChartSvgAndBase64(chartItem);
+              const html = buildKundliChartHtml(svg, base64);
+              const hasChart = Boolean(html);
               return (
-                <View key={key} style={styles.chartCard}>
+                <View key={String(key)} style={styles.chartCard}>
                   <Text style={styles.chartLabel}>
                     {isHindi ? `कुंडली चार्ट (${label})` : `Kundli Chart (${label})`}
                   </Text>
-                  {hasChart && html ? (
+                  {hasChart ? (
                     <WebView
                       source={{ html }}
                       style={styles.chartWebView}
                       scrollEnabled={false}
-                      originWhitelist={['*']}
-                      androidLayerType={Platform.OS === 'android' ? 'hardware' : undefined}
+                      showsVerticalScrollIndicator={false}
+                      showsHorizontalScrollIndicator={false}
+                      bounces={false}
+                      overScrollMode="never"
+                      nestedScrollEnabled={false}
+                      originWhitelist={["*"]}
+                      mixedContentMode="always"
+                      androidLayerType={
+                        Platform.OS === "android" ? "hardware" : undefined
+                      }
                     />
                   ) : (
                     <Text style={styles.placeholderText}>
-                      {isHindi ? 'चार्ट उपलब्ध नहीं' : 'Chart not available'}
+                      {isHindi ? "चार्ट उपलब्ध नहीं" : "Chart not available"}
                     </Text>
                   )}
                 </View>
