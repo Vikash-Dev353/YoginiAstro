@@ -30,7 +30,7 @@ export function WalletScreen({ navigation }: Props) {
   const token = useAppSelector((state) => state.auth.token);
   const astroIdFromStore = useAppSelector((state) => state.auth.astroId);
 
-  const astroId = astroIdFromStore?.trim().toUpperCase();
+  const astroId = astroIdFromStore?.trim().toUpperCase() ?? '';
 
   const [walletData, setWalletData] =
     useState<GetMonthlyEarningsResponse | null>(null);
@@ -38,7 +38,7 @@ export function WalletScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchWallet = useCallback(async () => {
-    if (!token) {
+    if (!token || !astroId) {
       setLoading(false);
       return;
     }

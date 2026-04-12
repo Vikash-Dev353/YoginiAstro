@@ -1,124 +1,217 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { AuthStackParamList } from '../../navigation/types';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { clearAuthError, signup } from '../../store/slices/authSlice';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { images } from '../../assets/images';
+import { AppButton } from '../../components/common/AppButton';
+import { AppInput } from '../../components/common/AppInput';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
-import { normalizeFont } from '../../utils/responsive';
-import { AuthScaffold } from '../../components/common/AuthScaffold';
+import { AuthStackParamList } from '../../navigation/types';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { clearAuthError, sendRegisterOtp } from '../../store/slices/authSlice';
+import { hp, normalizeFont, wp } from '../../utils/responsive';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
-export function SignupScreen({ navigation }: Props) {
+function SignupScreenComponent({ navigation }: Props) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector(state => state.auth);
+  const { loading, error: apiError } = useAppSelector(state => state.auth);
+  const [mobile, setMobile] = useState('');
+  const [localError, setLocalError] = useState('');
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const onMobileChange = useCallback(
+    (value: string) => {
+      const onlyDigits = value.replace(/\D/g, '').slice(0, 10);
+      setMobile(onlyDigits);
+      if (localError) {
+        setLocalError('');
+      }
+      if (apiError) {
+        dispatch(clearAuthError());
+      }
+    },
+    [apiError, dispatch, localError],
+  );
 
-  const onSignupPress = () => {
+  const onGetOtp = useCallback(async () => {
+    if (mobile.length !== 10) {
+      setLocalError(t('auth.invalidMobile'));
+      return;
+    }
+    setLocalError('');
     dispatch(clearAuthError());
-    dispatch(signup({ name, email, password }));
-  };
+
+    try {
+      const response = await dispatch(sendRegisterOtp({ mobile })).unwrap();
+      if (response.status?.toLowerCase() === 'success') {
+        navigation.navigate('OtpVerification', { mobile, flow: 'register' });
+        return;
+      }
+      setLocalError(
+        response.message || 'Unable to send OTP. Please try again.',
+      );
+    } catch {
+      // auth.error set by slice
+    }
+  }, [dispatch, mobile, navigation, t]);
+
+  const onLoginPress = useCallback(() => {
+    navigation.navigate('Login');
+  }, [navigation]);
+
+  const onTermsPress = useCallback(() => {
+    navigation.navigate('TermsAndConditions');
+  }, [navigation]);
+
+  const onPrivacyPress = useCallback(() => {
+    navigation.navigate('PrivacyPolicy');
+  }, [navigation]);
 
   return (
-    <AuthScaffold
-      title={t('auth.createAccount')}
-      subtitle={t('auth.signupSubtitle')}
-    >
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder={t('auth.fullName')}
-        style={styles.input}
-      />
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View>
+            <View style={styles.logoSection}>
+              <Image
+                source={images.logo}
+                style={styles.headerIconImage}
+                resizeMode="contain"
+              />
+            </View>
 
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder={t('auth.email')}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        style={styles.input}
-      />
+            <AppInput
+              label={t('auth.mobileNumber')}
+              required
+              value={mobile}
+              onChangeText={onMobileChange}
+              keyboardType="number-pad"
+              placeholder={t('auth.enterMobile')}
+              maxLength={10}
+              wrapperStyle={styles.inputBlock}
+              leftAdornment={<Text style={styles.prefix}>IN +91</Text>}
+            />
 
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder={t('auth.password')}
-        secureTextEntry
-        style={styles.input}
-      />
+            {localError || apiError ? (
+              <Text style={styles.error}>{localError || apiError}</Text>
+            ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Text style={styles.termsText}>
+              {`${t('auth.termsPrefix')} `}
+              <Text style={styles.termsLink} onPress={onTermsPress}>
+                {t('auth.termsOfUse')}
+              </Text>
+              {` ${t('common.and')} `}
+              <Text style={styles.termsLink} onPress={onPrivacyPress}>
+                {t('auth.privacyPolicy')}
+              </Text>
+            </Text>
+          </View>
 
-      <Pressable style={styles.primaryButton} onPress={onSignupPress}>
-        {loading ? (
-          <ActivityIndicator color={colors.surface} />
-        ) : (
-          <Text style={styles.primaryButtonText}>{t('common.signup')}</Text>
-        )}
-      </Pressable>
+          <View style={styles.bottomSection}>
+            <AppButton
+              title={t('auth.getOtp')}
+              onPress={onGetOtp}
+              loading={loading}
+            />
 
-      <View style={styles.row}>
-        <Text style={styles.helperText}>{t('auth.haveAccount')}</Text>
-        <Pressable onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.link}>{` ${t('common.login')}`}</Text>
-        </Pressable>
-      </View>
-    </AuthScaffold>
+            <View style={styles.loginRow}>
+              <Text style={styles.loginHint}>{t('auth.haveAccount')}</Text>
+              <Pressable onPress={onLoginPress}>
+                <Text style={styles.loginLink}>{` ${t('common.login')}`}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
+export const SignupScreen = memo(SignupScreenComponent);
+
 const styles = StyleSheet.create({
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 48,
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  flex: {
+    flex: 1,
+  },
+  headerIconImage: {
+    width: 250,
+    height: 250,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4.5),
+    paddingBottom: hp(4),
+    paddingTop: hp(4),
+  },
+  logoSection: {
+    alignItems: 'center',
+    marginTop: hp(2),
+    marginBottom: hp(6),
+  },
+  inputBlock: {
     marginBottom: 12,
+  },
+  prefix: {
+    fontSize: normalizeFont(16 / 1.1),
+    color: '#2F2A2A',
   },
   error: {
     color: colors.error,
-    marginBottom: 12,
+    marginBottom: 8,
     fontSize: normalizeFont(12),
   },
-  primaryButton: {
-    marginTop: 8,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
+  termsText: {
+    marginTop: 4,
+    color: '#6E6A6A',
+    fontSize: normalizeFont(29 / 2.4),
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  termsLink: {
+    color: '#413D3D',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  bottomSection: {
+    paddingBottom: hp(2),
+  },
+  loginRow: {
+    marginTop: 20,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  primaryButtonText: {
-    color: colors.surface,
+  loginHint: {
+    color: '#6E6A6A',
+    fontSize: normalizeFont(30 / 2.3),
+  },
+  loginLink: {
+    color: '#2B2424',
+    fontSize: normalizeFont(31 / 2.3),
     fontWeight: '700',
-    fontSize: normalizeFont(15),
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  helperText: {
-    color: colors.textSecondary,
-  },
-  link: {
-    color: colors.primary,
-    fontWeight: '600',
   },
 });

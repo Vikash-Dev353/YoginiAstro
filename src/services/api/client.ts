@@ -7,6 +7,8 @@ export const setAccessToken = (token: string | null) => {
 };
 
 const BASE_URL = "https://yoginiastro.com/api/mob";
+// const BASE_URL = "https://yoginiastro.com/api-v2/astrologer";
+// const BASE_URL = "http://192.168.1.9:3500/mob/astro";
 const ENABLE_API_LOGS = true;
 
 const getFullUrl = (config?: AxiosRequestConfig) => {

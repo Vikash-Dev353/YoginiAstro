@@ -13,26 +13,39 @@ export type SetOnlinePayload = {
   callOnline: boolean;
 };
 
+/** Astrologer block from get-online / set-online (root or nested under `data`) */
+export type OnlineAstrologerInfo = {
+  astroId?: string;
+  name?: string;
+  mobile?: string;
+  isOnline?: string;
+  chatStatus?: 'online' | 'offline' | string;
+  callStatus?: 'online' | 'offline' | string;
+  profileImage?: string;
+  experience?: number;
+  skills?: string[];
+};
+
 export type OnlineStatusResponse = {
   status?: string;
   message?: string;
-  astrologer?: {
-    astroId?: string;
-    name?: string;
-    mobile?: string;
-    chatStatus?: 'online' | 'offline' | string;
-    callStatus?: 'online' | 'offline' | string;
-    profileImage?: string;
-    experience?: number;
-    skills?: string[];
-  };
+  astrologer?: OnlineAstrologerInfo;
   chatOnline?: boolean;
   callOnline?: boolean;
   data?: {
+    status?: string;
+    astrologer?: OnlineAstrologerInfo;
     chatOnline?: boolean;
     callOnline?: boolean;
   };
 };
+
+/** Server may return astrologer at root or under `data` */
+export function getAstrologerFromOnlineResponse(
+  response: OnlineStatusResponse,
+): OnlineAstrologerInfo | undefined {
+  return response.astrologer ?? response.data?.astrologer;
+}
 
 /** Payload for astrology/generate-kundali API (request body) */
 export type GenerateKundaliPayload = {
@@ -266,6 +279,75 @@ export type GetLatestReviewsResponse = {
   data?: LatestReviewApiItem[];
 };
 
+export type UpdateProfileResponse = {
+  status?: string;
+  message?: string;
+  [key: string]: unknown;
+};
+
+export type AstroProfile = {
+  astroId?: string;
+  name?: string;
+  gender?: string;
+  languages?: string[] | string;
+  skills?: string[] | string;
+  email?: string;
+  description?: string;
+  experience?: number | string;
+  price?: number | string;
+  callPrice?: number | string;
+  dob?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  profileImage?: string;
+  speciality?: string[] | string;
+  /** When backend exposes approval state */
+  isApproved?: boolean;
+  adminApproved?: boolean;
+  approvalStatus?: string;
+  accountStatus?: string;
+  verified?: boolean;
+};
+
+/** True when admin has approved the astrologer for the main app (best-effort across possible API shapes). */
+export function isAstrologerApprovedByAdmin(
+  profile: AstroProfile | undefined,
+): boolean {
+  if (!profile) {
+    return false;
+  }
+  if (profile.isApproved === true || profile.adminApproved === true) {
+    return true;
+  }
+  if (profile.verified === true) {
+    return true;
+  }
+  const raw = `${profile.approvalStatus ?? profile.accountStatus ?? ''}`
+    .trim()
+    .toLowerCase();
+  if (!raw) {
+    return false;
+  }
+  if (raw.includes('pending') || raw.includes('await')) {
+    return false;
+  }
+  if (raw.includes('approved') || raw === 'active' || raw === 'verified') {
+    return true;
+  }
+  return false;
+}
+
+export type GetProfileResponse = {
+  status?: string;
+  message?: string;
+  astrologer?: AstroProfile;
+  data?: AstroProfile;
+  profile?: AstroProfile;
+};
+
 type WaitlistCacheEntry = {
   fetchedAt: number;
   data: WaitlistResponse;
@@ -343,5 +425,30 @@ export const astroApi = {
         astroId: payload.astroId.trim().toUpperCase(),
         limit: payload.limit ?? 20,
       },
+    ),
+  updateProfile: (payload: FormData) =>
+    apiService.post<UpdateProfileResponse>(
+      'https://yoginiastro.com/api/mob/astro/update-profile',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    ),
+  submitInitialProfile: (payload: FormData) =>
+    apiService.post<UpdateProfileResponse>(
+      'https://yoginiastro.com/api-v2/astrologer/initial-profile',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    ),
+  getProfile: (payload: { astroId: string }) =>
+    apiService.post<GetProfileResponse>(
+      'https://yoginiastro.com/api/mob/astro/get-profile',
+      { astroId: payload.astroId.trim().toUpperCase() },
     ),
 };

@@ -9,17 +9,22 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton } from "../../components/common/AppButton";
+import { AppHeader } from "../../components/common/AppHeader";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { AuthStackParamList } from "../../navigation/types";
+import type { VerifyOtpResponse } from "../../services/api/authApi";
 import { useAppDispatch } from "../../store/hooks";
 import {
+  applyAuthGate,
   decodeAstroIdFromToken,
   sendOtp,
+  sendRegisterOtp,
   setAuthenticatedSession,
   verifyOtp,
+  verifyRegisterOtp,
 } from "../../store/slices/authSlice";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
 import { storage } from "../../utils/storage";
@@ -29,8 +34,26 @@ type Props = NativeStackScreenProps<AuthStackParamList, "OtpVerification">;
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 59;
 
+/** Flattens `{ data: { status, authorization, ... } }` from register OTP verify. */
+function normalizeVerifyOtpResponse(raw: unknown): VerifyOtpResponse {
+  const r = raw as Record<string, unknown>;
+  const data = r.data as Record<string, unknown> | undefined;
+  const merged =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? { ...r, ...data }
+      : r;
+  return {
+    message: merged.message as string | undefined,
+    status: (merged.status as string) ?? "",
+    token: merged.token as string | undefined,
+    authorization: merged.authorization as string | undefined,
+    astroId: merged.astroId as string | undefined,
+    user: merged.user as VerifyOtpResponse["user"],
+  };
+}
+
 function OtpVerificationScreenComponent({ route, navigation }: Props) {
-  const { mobile } = route.params;
+  const { mobile, flow = "login" } = route.params;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -91,7 +114,12 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
     }
     setLoading(true);
     setError("");
-    dispatch(sendOtp({ mobile }))
+    const sendResend =
+      flow === "register"
+        ? dispatch(sendRegisterOtp({ mobile }))
+        : dispatch(sendOtp({ mobile }));
+
+    sendResend
       .unwrap()
       .then(() => {
         setOtp(Array(OTP_LENGTH).fill(""));
@@ -105,7 +133,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
         );
       })
       .finally(() => setLoading(false));
-  }, [dispatch, mobile, secondsLeft]);
+  }, [dispatch, flow, mobile, secondsLeft]);
 
   const onVerify = useCallback(async () => {
     if (otpValue.length !== OTP_LENGTH) {
@@ -117,41 +145,73 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
     setError("");
 
     try {
-      const response = await dispatch(
-        verifyOtp({ mobile, otp: otpValue })
-      ).unwrap();
-      const isSuccess = response.status?.toLowerCase() === "success";
+      const verifyAction =
+        flow === "register"
+          ? verifyRegisterOtp({ mobile, otp: otpValue })
+          : verifyOtp({ mobile, otp: otpValue });
+      const response = await dispatch(verifyAction).unwrap();
+      const normalized = normalizeVerifyOtpResponse(response);
+      const isSuccess = normalized.status?.toLowerCase() === "success";
 
       if (!isSuccess) {
-        setError(response.message || "Invalid OTP. Please try again.");
+        setError(normalized.message || "Invalid OTP. Please try again.");
         setLoading(false);
         return;
       }
 
       const token =
-        response.authorization?.trim() ||
-        (response as { token?: string }).token?.trim() ||
+        normalized.authorization?.trim() ||
+        normalized.token?.trim() ||
         `otp-session-${mobile}`;
-      const userId = response.user?.id?.trim();
-      const astroIdFromResponse =
-        (response as { astroId?: string }).astroId?.trim() ||
-        (response as { data?: { astroId?: string } }).data?.astroId?.trim();
+      const userId = normalized.user?.id?.trim();
+      const astroIdFromResponse = normalized.astroId?.trim();
       const resolvedAstroId =
         astroIdFromResponse ||
         (userId && userId.toUpperCase().startsWith("AS") ? userId : null) ||
         decodeAstroIdFromToken(token);
       await storage.setAuthToken(token);
-      dispatch(
-        setAuthenticatedSession({
-          token,
-          astroId: resolvedAstroId || null,
-          user: {
-            id: userId || resolvedAstroId || "72",
-            name: response.user?.name || "Shrimaan",
-            email: response.user?.email || `${mobile}@yoginiastro.com`,
-          },
-        })
-      );
+
+      if (flow === "register") {
+        dispatch(
+          setAuthenticatedSession({
+            token,
+            astroId: resolvedAstroId || null,
+            user: {
+              id: userId || resolvedAstroId || "72",
+              name: normalized.user?.name || "Shrimaan",
+              email: normalized.user?.email || `${mobile}@yoginiastro.com`,
+            },
+            pendingProfileCompletion: true,
+            pendingAdminApproval: true,
+          })
+        );
+        await dispatch(
+          applyAuthGate({
+            pendingProfileCompletion: true,
+            pendingAdminApproval: true,
+          })
+        ).unwrap();
+        navigation.replace("CompleteProfile");
+      } else {
+        dispatch(
+          setAuthenticatedSession({
+            token,
+            astroId: resolvedAstroId || null,
+            user: {
+              id: userId || resolvedAstroId || "72",
+              name: normalized.user?.name || "Shrimaan",
+              email: normalized.user?.email || `${mobile}@yoginiastro.com`,
+            },
+          })
+        );
+        await dispatch(
+          applyAuthGate({
+            pendingProfileCompletion: false,
+            pendingAdminApproval: false,
+          })
+        ).unwrap();
+      }
+      setLoading(false);
     } catch (apiError) {
       setError(
         (apiError as { message?: string })?.message ||
@@ -159,39 +219,22 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
       );
       setLoading(false);
     }
-  }, [dispatch, mobile, otpValue, t]);
+  }, [dispatch, flow, mobile, navigation, otpValue, t]);
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
-  const insets = useSafeAreaInsets();
 
   return (
-    <View
-      style={[
-        styles.safeArea,
-        {
-          paddingTop: insets.top,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          paddingBottom: insets.bottom,
-        },
-      ]}
-    >
+    <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
+      <AppHeader
+        title={t("auth.verifyPhone")}
+        showBack
+        onBackPress={() => navigation.goBack()}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
-        <View style={styles.header}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>{"<"}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>{t("auth.verifyPhone")}</Text>
-          <View style={styles.headerRightSpace} />
-        </View>
-
         <View style={styles.content}>
           <Text style={styles.infoText}>
             {`${t("auth.otpSent")}`}
@@ -245,7 +288,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
           />
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -258,37 +301,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-  },
-  header: {
-    height: 56,
-    borderBottomWidth: 1,
-    borderBottomColor: "#B7B1B1",
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#8D5858",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: {
-    fontSize: normalizeFont(22),
-    color: "#351E1E",
-    marginTop: -2,
-  },
-  headerTitle: {
-    fontSize: normalizeFont(32 / 2),
-    color: "#3A2323",
-    fontWeight: "700",
-  },
-  headerRightSpace: {
-    width: 44,
   },
   content: {
     flex: 1,

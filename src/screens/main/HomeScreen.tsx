@@ -21,7 +21,10 @@ import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { AppLanguage } from "../../localization/translations";
 import { HomeStackParamList, RootTabParamList } from "../../navigation/types";
-import { astroApi } from "../../services/api/astroApi";
+import {
+  astroApi,
+  getAstrologerFromOnlineResponse,
+} from "../../services/api/astroApi";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { changeAppLanguage } from "../../store/slices/languageSlice";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
@@ -126,25 +129,27 @@ function HomeScreenComponent({ navigation }: Props) {
       setIsStatusSyncing(true);
       const response = await astroApi.getOnline({ astroId });
 
+      const astrologer = getAstrologerFromOnlineResponse(response);
+
       const callOnline =
-        ((response.astrologer?.callStatus ?? "").toLowerCase() === "online" ||
+        ((astrologer?.callStatus ?? "").toLowerCase() === "online" ||
           response.callOnline) ??
         response.data?.callOnline ??
         false;
 
       const chatOnline =
-        ((response.astrologer?.chatStatus ?? "").toLowerCase() === "online" ||
+        ((astrologer?.chatStatus ?? "").toLowerCase() === "online" ||
           response.chatOnline) ??
         response.data?.chatOnline ??
         false;
 
       setVoiceEnabled(Boolean(callOnline));
       setChatEnabled(Boolean(chatOnline));
-      if (response.astrologer?.name) {
-        setAstroName(response.astrologer.name);
+      if (astrologer?.name) {
+        setAstroName(astrologer.name);
       }
-      if (response.astrologer?.mobile) {
-        setAstroMobile(response.astrologer.mobile);
+      if (astrologer?.mobile) {
+        setAstroMobile(astrologer.mobile);
       }
     } catch (error) {
       console.log("GET ONLINE STATUS ERROR", error);
@@ -341,10 +346,10 @@ function HomeScreenComponent({ navigation }: Props) {
               <Text style={styles.earningTitle}>
                 {t("home.decemberEarning")}
               </Text>
-              <Text style={styles.invoiceText}>{t("home.invoiceAck")}</Text>
+              {/* <Text style={styles.invoiceText}>{t("home.invoiceAck")}</Text> */}
             </View>
             <Pressable style={styles.arrowButton}>
-              {/* <Text style={styles.arrowText}>{'>'}</Text> */}
+              
               <Image
                 source={images.chevronRight}
                 style={styles.arrowImage}

@@ -18,7 +18,16 @@ const navigationTheme = {
 
 export function RootNavigator() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, isBootstrapping } = useAppSelector(state => state.auth);
+  const {
+    isAuthenticated,
+    isBootstrapping,
+    pendingProfileCompletion,
+    pendingAdminApproval,
+  } = useAppSelector(state => state.auth);
+  const canEnterMainApp =
+    isAuthenticated &&
+    !pendingProfileCompletion &&
+    !pendingAdminApproval;
   const isLanguageBootstrapping = useAppSelector(
     state => state.language.isBootstrapping,
   );
@@ -34,7 +43,7 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />}
+      {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 }

@@ -62,6 +62,11 @@ export const translations = {
       createAccount: 'Create Account',
       signupSubtitle: 'Signup to manage your astrology consultations',
       fullName: 'Full Name',
+      enterFullName: 'Enter your full name',
+      enterEmail: 'Enter your email',
+      enterPassword: 'Create a password',
+      fillAllFields: 'Please fill all fields',
+      invalidEmailFormat: 'Please enter a valid email',
       email: 'Email',
       password: 'Password',
       verifyPhone: 'Verify Phone',
@@ -69,6 +74,13 @@ export const translations = {
       resendOtp: 'Resend OTP Available In',
       otpError: 'Please enter complete OTP',
       brightFuture: 'A BRIGHT FUTURE THROUGH ASTROLOGICAL GUIDANCE',
+      registerSuccessBody: 'Your phone number has been verified successfully.',
+      completeProfileButton: 'Complete profile',
+      returnToLoginLink: 'Return to login',
+      pendingApprovalTitle: 'Awaiting admin approval',
+      pendingApprovalBody:
+        'Your profile details are submitted. You will have full access after an admin approves your account.',
+      pendingApprovalRefresh: 'Check status',
     },
     profile: {
       astrologerProfile: 'Astrologer Profile',
@@ -76,6 +88,37 @@ export const translations = {
       paySlip: 'Pay Slip',
       downloadForm: 'Download Form 16A',
       termConditions: 'Term & Conditions',
+    },
+    completeProfile: {
+      headline: 'Complete your details to register as an astrologer',
+      uploadPhoto: 'Upload Profile Photo',
+      fullName: 'Full Name',
+      enterFullName: 'Enter Full Name',
+      gender: 'Gender',
+      selectGender: 'Select Gender',
+      dateOfBirth: 'Date of Birth',
+      dobPlaceholder: 'DD/MM/YY',
+      skills: 'Skills',
+      selectSkills: 'Select skills',
+      selectSpeciality: 'Select speciality',
+      speciality: 'Speciality',
+      experience: 'Experiences',
+      enterExperience: 'Enter Experience',
+      address: 'Address',
+      enterAddress: 'Enter Address',
+      pincode: 'Pincode',
+      enterPincode: 'Enter Pincode',
+      languages: 'Languages',
+      selectLanguage: 'Select Language',
+      country: 'Country',
+      city: 'City',
+      selectCity: 'Select your city',
+      state: 'State',
+      selectState: 'Select Your State',
+      submitRegistration: 'Submit Registration',
+      returnToLogin: 'Return to Login',
+      submitTitle: 'Registration',
+      submitMessage: 'Your details have been submitted.',
     },
     reviewScreen: {
       loading: 'Loading reviews...',
@@ -169,6 +212,11 @@ export const translations = {
       createAccount: 'अकाउंट बनाएं',
       signupSubtitle: 'अपनी ज्योतिष परामर्श सेवाएं संभालने के लिए साइन अप करें',
       fullName: 'पूरा नाम',
+      enterFullName: 'अपना पूरा नाम दर्ज करें',
+      enterEmail: 'अपना ईमेल दर्ज करें',
+      enterPassword: 'पासवर्ड बनाएं',
+      fillAllFields: 'कृपया सभी फ़ील्ड भरें',
+      invalidEmailFormat: 'कृपया सही ईमेल दर्ज करें',
       email: 'ईमेल',
       password: 'पासवर्ड',
       verifyPhone: 'फोन सत्यापित करें',
@@ -176,6 +224,13 @@ export const translations = {
       resendOtp: 'ओटीपी दोबारा उपलब्ध होगा',
       otpError: 'कृपया पूरा ओटीपी दर्ज करें',
       brightFuture: 'ज्योतिषीय मार्गदर्शन से उज्ज्वल भविष्य',
+      registerSuccessBody: 'आपका फोन नंबर सफलतापूर्वक सत्यापित हो गया है।',
+      completeProfileButton: 'प्रोफाइल पूरी करें',
+      returnToLoginLink: 'लॉगिन पर वापस जाएं',
+      pendingApprovalTitle: 'एडमिन की मंज़ूरी लंबित',
+      pendingApprovalBody:
+        'आपकी प्रोफाइल जमा हो गई है। एडमिन द्वारा स्वीकृति के बाद ही पूरी पहुंच मिलेगी।',
+      pendingApprovalRefresh: 'स्थिति जाँचें',
     },
     profile: {
       astrologerProfile: 'ज्योतिष प्रोफाइल',
@@ -183,6 +238,37 @@ export const translations = {
       paySlip: 'पे स्लिप',
       downloadForm: 'फॉर्म 16A डाउनलोड करें',
       termConditions: 'नियम और शर्तें',
+    },
+    completeProfile: {
+      headline: 'ज्योतिषी के रूप में पंजीकरण के लिए अपनी जानकारी पूरी करें',
+      uploadPhoto: 'प्रोफाइल फोटो अपलोड करें',
+      fullName: 'पूरा नाम',
+      enterFullName: 'पूरा नाम दर्ज करें',
+      gender: 'लिंग',
+      selectGender: 'लिंग चुनें',
+      dateOfBirth: 'जन्म तिथि',
+      dobPlaceholder: 'DD/MM/YY',
+      skills: 'कौशल',
+      selectSkills: 'कौशल चुनें',
+      selectSpeciality: 'विशेषज्ञता चुनें',
+      speciality: 'विशेषज्ञता',
+      experience: 'अनुभव',
+      enterExperience: 'अनुभव दर्ज करें',
+      address: 'पता',
+      enterAddress: 'पता दर्ज करें',
+      pincode: 'पिनकोड',
+      enterPincode: 'पिनकोड दर्ज करें',
+      languages: 'भाषाएं',
+      selectLanguage: 'भाषा चुनें',
+      country: 'देश',
+      city: 'शहर',
+      selectCity: 'अपना शहर चुनें',
+      state: 'राज्य',
+      selectState: 'अपना राज्य चुनें',
+      submitRegistration: 'पंजीकरण जमा करें',
+      returnToLogin: 'लॉगिन पर वापस जाएं',
+      submitTitle: 'पंजीकरण',
+      submitMessage: 'आपकी जानकारी जमा की गई है।',
     },
     reviewScreen: {
       loading: 'रिव्यू लोड हो रहे हैं...',
@@ -269,6 +355,11 @@ export type TranslationKey =
   | 'auth.createAccount'
   | 'auth.signupSubtitle'
   | 'auth.fullName'
+  | 'auth.enterFullName'
+  | 'auth.enterEmail'
+  | 'auth.enterPassword'
+  | 'auth.fillAllFields'
+  | 'auth.invalidEmailFormat'
   | 'auth.email'
   | 'auth.password'
   | 'auth.verifyPhone'
@@ -276,11 +367,46 @@ export type TranslationKey =
   | 'auth.resendOtp'
   | 'auth.otpError'
   | 'auth.brightFuture'
+  | 'auth.registerSuccessBody'
+  | 'auth.completeProfileButton'
+  | 'auth.returnToLoginLink'
+  | 'auth.pendingApprovalTitle'
+  | 'auth.pendingApprovalBody'
+  | 'auth.pendingApprovalRefresh'
   | 'profile.astrologerProfile'
   | 'profile.clearDataLogout'
   | 'profile.paySlip'
   | 'profile.downloadForm'
   | 'profile.termConditions'
+  | 'completeProfile.headline'
+  | 'completeProfile.uploadPhoto'
+  | 'completeProfile.fullName'
+  | 'completeProfile.enterFullName'
+  | 'completeProfile.gender'
+  | 'completeProfile.selectGender'
+  | 'completeProfile.dateOfBirth'
+  | 'completeProfile.dobPlaceholder'
+  | 'completeProfile.skills'
+  | 'completeProfile.selectSkills'
+  | 'completeProfile.selectSpeciality'
+  | 'completeProfile.speciality'
+  | 'completeProfile.experience'
+  | 'completeProfile.enterExperience'
+  | 'completeProfile.address'
+  | 'completeProfile.enterAddress'
+  | 'completeProfile.pincode'
+  | 'completeProfile.enterPincode'
+  | 'completeProfile.languages'
+  | 'completeProfile.selectLanguage'
+  | 'completeProfile.country'
+  | 'completeProfile.city'
+  | 'completeProfile.selectCity'
+  | 'completeProfile.state'
+  | 'completeProfile.selectState'
+  | 'completeProfile.submitRegistration'
+  | 'completeProfile.returnToLogin'
+  | 'completeProfile.submitTitle'
+  | 'completeProfile.submitMessage'
   | 'reviewScreen.loading'
   | 'reviewScreen.empty'
   | 'reviewScreen.error'

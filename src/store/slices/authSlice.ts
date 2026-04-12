@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { authApi } from '../../services/api/authApi';
 import { setAccessToken } from '../../services/api/client';
-import { storage } from '../../utils/storage';
+import { type AuthGateSnapshot, storage } from '../../utils/storage';
 
 export function decodeAstroIdFromToken(token: string | null): string | null {
   if (!token || token.split('.').length < 2) return null;
@@ -15,8 +15,28 @@ export function decodeAstroIdFromToken(token: string | null): string | null {
       '=',
     );
     const json = atobFn(padded);
-    const payload = JSON.parse(json) as { astroId?: string };
+    const payload = JSON.parse(json) as { astroId?: string; mobile?: string };
     return payload.astroId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function decodeMobileFromToken(token: string | null): string | null {
+  if (!token || token.split('.').length < 2) return null;
+  const atobFn = (globalThis as { atob?: (s: string) => string }).atob;
+  if (typeof atobFn !== 'function') return null;
+  try {
+    const base64 = token.split('.')[1];
+    const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    const json = atobFn(padded);
+    const payload = JSON.parse(json) as { mobile?: string };
+    const m = payload.mobile?.trim();
+    return m && m.length > 0 ? m : null;
   } catch {
     return null;
   }
@@ -33,10 +53,15 @@ type AuthState = {
   token: string | null;
   astroId: string | null;
   isAuthenticated: boolean;
+  pendingProfileCompletion: boolean;
+  /** After initial profile submit — block main app until admin approves */
+  pendingAdminApproval: boolean;
   isBootstrapping: boolean;
   loading: boolean;
   error: string | null;
   authEntryRoute: 'Login' | 'Signup';
+  /** After register OTP verify — show success modal before home tasks */
+  registerSuccessModalVisible: boolean;
 };
 
 const initialState: AuthState = {
@@ -44,19 +69,36 @@ const initialState: AuthState = {
   token: null,
   astroId: null,
   isAuthenticated: false,
+  pendingProfileCompletion: false,
+  pendingAdminApproval: false,
   isBootstrapping: true,
   loading: false,
   error: null,
   authEntryRoute: 'Login',
+  registerSuccessModalVisible: false,
 };
 
 export const bootstrapAuth = createAsyncThunk(
   'auth/bootstrap',
-  async (): Promise<{ token: string | null; astroId: string | null }> => {
+  async (): Promise<{
+    token: string | null;
+    astroId: string | null;
+    gate: AuthGateSnapshot | null;
+  }> => {
     const token = await storage.getAuthToken();
-    if (!token) return { token: null, astroId: null };
+    if (!token) return { token: null, astroId: null, gate: null };
     const astroId = decodeAstroIdFromToken(token);
-    return { token, astroId };
+    const gate = await storage.getAuthGate();
+    return { token, astroId, gate };
+  },
+);
+
+/** Persists gate flags and updates Redux (use after register / profile / approval checks). */
+export const applyAuthGate = createAsyncThunk(
+  'auth/applyAuthGate',
+  async (gate: AuthGateSnapshot) => {
+    await storage.setAuthGate(gate);
+    return gate;
   },
 );
 
@@ -66,6 +108,10 @@ export const login = createAsyncThunk(
     try {
       const response = await authApi.login(payload);
       await storage.setAuthToken(response.token);
+      await storage.setAuthGate({
+        pendingProfileCompletion: false,
+        pendingAdminApproval: false,
+      });
       return response;
     } catch {
       return rejectWithValue('Login failed. Please try again.');
@@ -78,6 +124,21 @@ export const sendOtp = createAsyncThunk(
   async (payload: { mobile: string }, { rejectWithValue }) => {
     try {
       const response = await authApi.sendOtp(payload);
+      return response;
+    } catch (error) {
+      const errorMessage =
+        (error as { message?: string })?.message ||
+        'Unable to send OTP. Please try again.';
+      return rejectWithValue(errorMessage);
+    }
+  },
+);
+
+export const sendRegisterOtp = createAsyncThunk(
+  'auth/sendRegisterOtp',
+  async (payload: { mobile: string }, { rejectWithValue }) => {
+    try {
+      const response = await authApi.sendRegisterOtp(payload);
       return response;
     } catch (error) {
       const errorMessage =
@@ -106,6 +167,24 @@ export const verifyOtp = createAsyncThunk(
   },
 );
 
+export const verifyRegisterOtp = createAsyncThunk(
+  'auth/verifyRegisterOtp',
+  async (
+    payload: { mobile: string; otp: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await authApi.verifyRegisterOtp(payload);
+      return response;
+    } catch (error) {
+      const errorMessage =
+        (error as { message?: string })?.message ||
+        'Unable to verify OTP. Please try again.';
+      return rejectWithValue(errorMessage);
+    }
+  },
+);
+
 export const signup = createAsyncThunk(
   'auth/signup',
   async (
@@ -115,6 +194,10 @@ export const signup = createAsyncThunk(
     try {
       const response = await authApi.signup(payload);
       await storage.setAuthToken(response.token);
+      await storage.setAuthGate({
+        pendingProfileCompletion: false,
+        pendingAdminApproval: false,
+      });
       return response;
     } catch {
       return rejectWithValue('Signup failed. Please try again.');
@@ -133,13 +216,25 @@ const authSlice = createSlice({
     clearAuthError: state => {
       state.error = null;
     },
+    setRegisterSuccessModalVisible: (state, action: { payload: boolean }) => {
+      state.registerSuccessModalVisible = action.payload;
+    },
     setAuthEntryRoute: (state, action: { payload: 'Login' | 'Signup' }) => {
       state.authEntryRoute = action.payload;
+    },
+    setProfileCompletionPending: (state, action: { payload: boolean }) => {
+      state.pendingProfileCompletion = action.payload;
     },
     setAuthenticatedSession: (
       state,
       action: {
-        payload: { token: string; user?: User; astroId?: string | null };
+        payload: {
+          token: string;
+          user?: User;
+          astroId?: string | null;
+          pendingProfileCompletion?: boolean;
+          pendingAdminApproval?: boolean;
+        };
       },
     ) => {
       const { token: tokenPayload, astroId: payloadAstroId } = action.payload;
@@ -158,6 +253,9 @@ const authSlice = createSlice({
           email: 'otp@yoginiastro.com',
         } as User);
       state.isAuthenticated = true;
+      state.pendingProfileCompletion =
+        action.payload.pendingProfileCompletion ?? false;
+      state.pendingAdminApproval = action.payload.pendingAdminApproval ?? false;
       state.error = null;
       state.authEntryRoute = 'Login';
       setAccessToken(action.payload.token);
@@ -170,6 +268,13 @@ const authSlice = createSlice({
         state.token = payload.token;
         state.astroId = payload.astroId ?? null;
         state.isAuthenticated = Boolean(payload.token);
+        if (payload.gate) {
+          state.pendingProfileCompletion = payload.gate.pendingProfileCompletion;
+          state.pendingAdminApproval = payload.gate.pendingAdminApproval;
+        } else {
+          state.pendingProfileCompletion = false;
+          state.pendingAdminApproval = false;
+        }
         state.isBootstrapping = false;
         setAccessToken(payload.token);
       })
@@ -190,6 +295,8 @@ const authSlice = createSlice({
           (action.payload as { astroId?: string }).astroId ??
           decodeAstroIdFromToken(action.payload.token);
         state.isAuthenticated = true;
+        state.pendingProfileCompletion = false;
+        state.pendingAdminApproval = false;
         state.authEntryRoute = 'Login';
         setAccessToken(action.payload.token);
       })
@@ -209,6 +316,18 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = (action.payload as string) || 'Something went wrong.';
       })
+      .addCase(sendRegisterOtp.pending, state => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(sendRegisterOtp.fulfilled, state => {
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(sendRegisterOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || 'Something went wrong.';
+      })
       .addCase(verifyOtp.pending, state => {
         state.loading = true;
         state.error = null;
@@ -221,6 +340,18 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = (action.payload as string) || 'Something went wrong.';
       })
+      .addCase(verifyRegisterOtp.pending, state => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyRegisterOtp.fulfilled, state => {
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(verifyRegisterOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || 'Something went wrong.';
+      })
       .addCase(signup.pending, state => {
         state.loading = true;
         state.error = null;
@@ -230,6 +361,8 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.isAuthenticated = true;
+        state.pendingProfileCompletion = false;
+        state.pendingAdminApproval = false;
         state.authEntryRoute = 'Login';
         setAccessToken(action.payload.token);
       })
@@ -237,16 +370,29 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = (action.payload as string) || 'Something went wrong.';
       })
+      .addCase(applyAuthGate.fulfilled, (state, action) => {
+        state.pendingProfileCompletion =
+          action.payload.pendingProfileCompletion;
+        state.pendingAdminApproval = action.payload.pendingAdminApproval;
+      })
       .addCase(logout.fulfilled, state => {
         state.user = null;
         state.token = null;
         state.astroId = null;
         state.isAuthenticated = false;
+        state.pendingProfileCompletion = false;
+        state.pendingAdminApproval = false;
+        state.registerSuccessModalVisible = false;
         setAccessToken(null);
       });
   },
 });
 
-export const { clearAuthError, setAuthEntryRoute, setAuthenticatedSession } =
-  authSlice.actions;
+export const {
+  clearAuthError,
+  setAuthEntryRoute,
+  setAuthenticatedSession,
+  setProfileCompletionPending,
+  setRegisterSuccessModalVisible,
+} = authSlice.actions;
 export const authReducer = authSlice.reducer;

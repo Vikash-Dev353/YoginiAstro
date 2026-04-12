@@ -17,12 +17,6 @@ export function ProfileStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
-      <Stack.Screen name="CompleteProfile">
-        {props => <ProfileDetailScreen {...props} title={t('common.completeProfile')} />}
-      </Stack.Screen>
-      <Stack.Screen name="ProfileWallet">
-        {props => <ProfileDetailScreen {...props} title={t('common.wallet')} />}
-      </Stack.Screen>
       <Stack.Screen name="CustomerSupport" component={SupportScreen} />
       <Stack.Screen name="GoLiveNow">
         {props => <ProfileDetailScreen {...props} title={t('common.goLiveNow')} />}

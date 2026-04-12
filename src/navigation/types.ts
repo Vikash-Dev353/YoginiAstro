@@ -4,8 +4,12 @@ import type { GenerateKundaliPayload } from '../services/api/astroApi';
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
+  CompleteProfile: undefined;
+  PendingApproval: undefined;
   OtpVerification: {
     mobile: string;
+    /** Register flow uses `astrologer/register/send-otp`; login uses login send-otp */
+    flow?: 'login' | 'register';
   };
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;
@@ -18,8 +22,6 @@ export type OrderStackParamList = {
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
-  CompleteProfile: undefined;
-  ProfileWallet: undefined;
   CustomerSupport: undefined;
   GoLiveNow: undefined;
   Review: undefined;

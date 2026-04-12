@@ -202,9 +202,10 @@ export function OrderScreen({ route, navigation }: Props) {
   const astroIdFromStore = useAppSelector((state) => state.auth.astroId);
   const tabs: OrderTab[] = ["Waitlist", "Voice Call", "Chat", "Pooja Booking"];
 
-  const astroId =
+  const astroId: string =
     astroIdFromStore?.trim().toUpperCase() ||
-    decodeAstroIdFromToken(token)?.trim().toUpperCase();
+    decodeAstroIdFromToken(token)?.trim().toUpperCase() ||
+    '';
 
   const tabLabel: Record<OrderTab, string> = {
     Waitlist: t("order.waitlist"),
@@ -244,7 +245,7 @@ export function OrderScreen({ route, navigation }: Props) {
   );
 
   useEffect(() => {
-    if (activeTab !== "Waitlist" || !token) {
+    if (activeTab !== "Waitlist" || !token || !astroId) {
       return;
     }
 
@@ -299,7 +300,7 @@ export function OrderScreen({ route, navigation }: Props) {
   }, [activeTab, appLanguage, astroId, token, orderFocusKey]);
 
   useEffect(() => {
-    if (activeTab !== "Chat" || !token) {
+    if (activeTab !== "Chat" || !token || !astroId) {
       return;
     }
 
@@ -333,7 +334,7 @@ export function OrderScreen({ route, navigation }: Props) {
   }, [activeTab, appLanguage, astroId, token, orderFocusKey]);
 
   useEffect(() => {
-    if (activeTab !== "Voice Call" || !token) {
+    if (activeTab !== "Voice Call" || !token || !astroId) {
       return;
     }
 

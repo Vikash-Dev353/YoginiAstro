@@ -47,13 +47,30 @@ export type VerifyOtpResponse = {
     name?: string;
     email?: string;
   };
+  /** Some endpoints wrap payload in `data` (e.g. register OTP “awaiting admin approval”). */
+  data?: {
+    message?: string;
+    status?: string;
+    authorization?: string;
+    astroId?: string;
+  };
 };
 
 export const authApi = {
   sendOtp: async (payload: SendOtpPayload) =>
     apiService.post<SendOtpResponse>(API_ROUTES.auth.sendOtp, payload),
+  sendRegisterOtp: async (payload: SendOtpPayload) =>
+    apiService.post<SendOtpResponse>(
+      API_ROUTES.auth.sendRegisterOtp,
+      payload,
+    ),
   verifyOtp: async (payload: VerifyOtpPayload) =>
     apiService.post<VerifyOtpResponse>(API_ROUTES.auth.verifyOtp, payload),
+  verifyRegisterOtp: async (payload: VerifyOtpPayload) =>
+    apiService.post<VerifyOtpResponse>(
+      API_ROUTES.auth.verifyRegisterOtp,
+      payload,
+    ),
 
   login: async (payload: LoginPayload) =>
     apiService.post<AuthResponse>(API_ROUTES.auth.login, payload),

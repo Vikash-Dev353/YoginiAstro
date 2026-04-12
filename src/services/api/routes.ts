@@ -1,14 +1,16 @@
 export const API_ROUTES = {
   auth: {
     sendOtp: "/astro/login/send-otp",
+    sendRegisterOtp: "/astro/register/send-otp",
+    verifyRegisterOtp: "/astro/register/verify-otp",
     verifyOtp: "/astro/login/verify-otp",
     getOnline: "/astro/get-online",
     setOnline: "/astro/set-online",
-    waitlist: (astroId: string) => `/astro/waitlist/${astroId}`,
-    getMonthlyEarnings: "/astro/get-monthly-earnings",
-    getLatestReviews: "/astro/get-latest-reviews",
+    waitlist: (astroId: string) => `astro/waitlist/${astroId}`,
+    getMonthlyEarnings: "/get-monthly-earnings",
+    getLatestReviews: "/get-latest-reviews",
     recentConsultations: (astroId: string) =>
-      `/astro/recent-consultations/${astroId}`,
+      `/recent-consultations/${astroId}`,
     login: "/auth/login",
     signup: "/auth/signup",
     refreshToken: "/auth/refresh-token",
