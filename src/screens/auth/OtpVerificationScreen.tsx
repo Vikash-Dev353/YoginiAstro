@@ -129,7 +129,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
       .catch((apiError) => {
         setError(
           (apiError as { message?: string })?.message ||
-            "Unable to resend OTP. Please try again."
+          "Unable to resend OTP. Please try again."
         );
       })
       .finally(() => setLoading(false));
@@ -215,7 +215,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
     } catch (apiError) {
       setError(
         (apiError as { message?: string })?.message ||
-          "Unable to verify OTP. Please try again."
+        "Unable to verify OTP. Please try again."
       );
       setLoading(false);
     }
@@ -263,17 +263,17 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
           </View>
 
           <View style={styles.resendRow}>
-            <Pressable onPress={onResend} disabled={secondsLeft > 0}>
-              <Text
-                style={[
-                  styles.resendLabel,
-                  secondsLeft === 0 && styles.resendEnabled,
-                ]}
-              >
-                {t("auth.resendOtp")}
-              </Text>
-            </Pressable>
-            <Text style={styles.timer}>{`${mm}:${ss}`}</Text>
+            {secondsLeft === 0 ?
+              <Pressable onPress={onResend} disabled={secondsLeft > 0}>
+                <Text
+                  style={[
+                    styles.resendLabel,
+                  ]}
+                >
+                  {t("auth.resendOtp")}
+                </Text>
+              </Pressable> :
+              <Text style={styles.timer}>{`${mm}:${ss}`}</Text>}
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}

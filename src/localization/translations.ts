@@ -71,7 +71,7 @@ export const translations = {
       password: 'Password',
       verifyPhone: 'Verify Phone',
       otpSent: 'Confirmation code has been sent to your\nmobile number',
-      resendOtp: 'Resend OTP Available In',
+      resendOtp: 'Resend OTP',
       otpError: 'Please enter complete OTP',
       brightFuture: 'A BRIGHT FUTURE THROUGH ASTROLOGICAL GUIDANCE',
       registerSuccessBody: 'Your phone number has been verified successfully.',
