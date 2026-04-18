@@ -2,6 +2,7 @@ import {
   BottomTabBarProps,
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { memo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { images } from '../assets/images';
@@ -19,6 +20,16 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 const CustomTabBar = memo(
   ({ state, descriptors, navigation }: BottomTabBarProps) => {
     const { t } = useTranslation();
+    const currentTabRoute = state.routes[state.index];
+    const nestedRouteName = getFocusedRouteNameFromRoute(currentTabRoute);
+    /** Hide tabs on live chat so the composer sits at the bottom instead of the tab bar. */
+    if (
+      currentTabRoute.name === 'Order' &&
+      nestedRouteName === 'ConsultationChat'
+    ) {
+      return null;
+    }
+
     const tabMeta: Record<keyof RootTabParamList, { label: string; icon: number }> = {
       Home: { label: t('common.home'), icon: images.tabHome },
       Order: { label: t('common.order'), icon: images.tabOrder },
@@ -96,6 +107,7 @@ export function MainTabNavigator() {
       tabBar={renderTabBar}
       screenOptions={{
         headerShown: false,
+        animation: 'none',
       }}
     >
       <Tab.Screen name="Home" component={HomeStackNavigator} />

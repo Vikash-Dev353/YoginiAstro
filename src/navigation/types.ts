@@ -18,6 +18,12 @@ export type AuthStackParamList = {
 export type OrderStackParamList = {
   OrderList: { initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking' } | undefined;
   ViewKundli: { name: string; id?: string; kundaliPayload?: GenerateKundaliPayload };
+  ConsultationChat: {
+    customerName: string;
+    roomId: string;
+    kundaliPayload?: GenerateKundaliPayload;
+    customerImage?: string | null;
+  };
 };
 
 export type ProfileStackParamList = {

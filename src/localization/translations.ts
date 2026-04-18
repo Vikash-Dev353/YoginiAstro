@@ -130,6 +130,10 @@ export const translations = {
       avgRating: 'Average rating',
       guestUser: 'User',
     },
+    chat: {
+      typeMessage: 'Type a message',
+      end: 'End',
+    },
     order: {
       waitlist: 'Waitlist',
       voiceCall: 'Voice Call',
@@ -280,6 +284,10 @@ export const translations = {
       avgRating: 'औसत रेटिंग',
       guestUser: 'यूज़र',
     },
+    chat: {
+      typeMessage: 'संदेश लिखें',
+      end: 'समाप्त',
+    },
     order: {
       waitlist: 'वेटलिस्ट',
       voiceCall: 'वॉइस कॉल',
@@ -415,6 +423,8 @@ export type TranslationKey =
   | 'reviewScreen.showLess'
   | 'reviewScreen.avgRating'
   | 'reviewScreen.guestUser'
+  | 'chat.typeMessage'
+  | 'chat.end'
   | 'order.waitlist'
   | 'order.voiceCall'
   | 'order.chat'

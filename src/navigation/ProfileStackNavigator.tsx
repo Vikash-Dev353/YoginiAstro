@@ -15,7 +15,9 @@ export function ProfileStackNavigator() {
   const { t } = useTranslation();
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, animation: 'none' }}
+    >
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="CustomerSupport" component={SupportScreen} />
       <Stack.Screen name="GoLiveNow">

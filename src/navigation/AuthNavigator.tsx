@@ -34,7 +34,7 @@ export function AuthNavigator() {
   return (
     <Stack.Navigator
       initialRouteName={initialRouteName}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'none' }}
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />

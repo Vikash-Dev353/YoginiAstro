@@ -35,6 +35,7 @@ type WaitlistItem = {
   timeLabel: string;
   kundliUrl?: string;
   generateKundaliPayload?: GenerateKundaliPayload;
+  profileImage?: string | null;
 };
 
 type VoiceCallItem = {
@@ -271,6 +272,7 @@ export function OrderScreen({ route, navigation }: Props) {
           timeLabel: getRequestedTimeLabel(entry.requestedAt),
           kundliUrl: entry.kundliUrl,
           generateKundaliPayload: entry.generateKundaliPayload,
+          profileImage: entry.senderImage,
         }));
 
         setWaitlistData(items.length > 0 ? items : DUMMY_WAITLIST);
@@ -469,10 +471,22 @@ export function OrderScreen({ route, navigation }: Props) {
           <Text style={styles.primaryName}>{waitlistItem.name}</Text>
           <Text style={styles.secondaryText}>{waitlistItem.message}</Text>
           <View style={styles.waitlistActions}>
-            <Pressable style={[styles.actionButton, styles.acceptButton]}>
+            <Pressable
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() =>
+                navigation.navigate("ConsultationChat", {
+                  customerName: waitlistItem.name,
+                  roomId: waitlistItem.id,
+                  kundaliPayload: waitlistItem.generateKundaliPayload,
+                  customerImage: waitlistItem.profileImage,
+                })
+              }
+            >
               <Text style={styles.actionButtonText}>{t("common.accept")}</Text>
             </Pressable>
-            <Pressable style={[styles.actionButton, styles.rejectButton]}>
+            <Pressable style={[styles.actionButton, styles.rejectButton]} onPress={()=>{
+              navigation.goBack();
+            }}>
               <Text style={styles.actionButtonText}>{t("common.reject")}</Text>
             </Pressable>
           </View>

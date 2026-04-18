@@ -1,5 +1,6 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { ConsultationChatScreen } from '../screens/main/ConsultationChatScreen';
 import { OrderScreen } from '../screens/main/OrderScreen';
 import { ViewKundliScreen } from '../screens/main/ViewKundliScreen';
 import { OrderStackParamList, RootTabParamList } from './types';
@@ -15,9 +16,12 @@ type Props = BottomTabScreenProps<RootTabParamList, 'Order'>;
  */
 export function OrderStackNavigator(_props: Props) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, animation: 'none' }}
+    >
       <Stack.Screen name="OrderList" component={OrderScreen} />
       <Stack.Screen name="ViewKundli" component={ViewKundliScreen} />
+      <Stack.Screen name="ConsultationChat" component={ConsultationChatScreen} />
     </Stack.Navigator>
   );
 }
