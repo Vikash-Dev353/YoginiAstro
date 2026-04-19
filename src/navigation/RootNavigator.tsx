@@ -1,8 +1,10 @@
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { attachDeviceToUser } from '../services/device/registerDevice';
+import { syncSocketWithSession } from '../services/socket';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { bootstrapAuth, decodeUserIdFromToken } from '../store/slices/authSlice';
 import { bootstrapLanguage } from '../store/slices/languageSlice';
@@ -35,6 +37,19 @@ export function RootNavigator() {
   const token = useAppSelector(state => state.auth.token);
   const user = useAppSelector(state => state.auth.user);
 
+  const [appState, setAppState] = useState<AppStateStatus>(() =>
+    AppState.currentState,
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setAppState(nextState);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const isAppForeground = appState === 'active';
+
   useEffect(() => {
     dispatch(bootstrapAuth());
     dispatch(bootstrapLanguage());
@@ -50,6 +65,14 @@ export function RootNavigator() {
     }
     void attachDeviceToUser({ authToken: token, userId });
   }, [canEnterMainApp, token, user?.id]);
+
+  useEffect(() => {
+    if (canEnterMainApp && token && isAppForeground) {
+      syncSocketWithSession({ authToken: token });
+    } else {
+      syncSocketWithSession({ authToken: null });
+    }
+  }, [canEnterMainApp, token, isAppForeground]);
 
   if (isBootstrapping || isLanguageBootstrapping) {
     return <AppLoader />;

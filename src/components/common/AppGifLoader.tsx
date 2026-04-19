@@ -8,14 +8,14 @@ type AppGifLoaderProps = {
   size?: number;
 };
 
-const DEFAULT_SIZE = 120;
+const DEFAULT_SIZE = 250;
 
 export function AppGifLoader({ message, size = DEFAULT_SIZE }: AppGifLoaderProps) {
   return (
     <View style={styles.container}>
       <Image
         source={images.loaderGif}
-        style={[styles.gif, { width: size, height: size }]}
+        style={[styles.gif]}
         resizeMode="contain"
       />
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -30,8 +30,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   gif: {
-    width: DEFAULT_SIZE,
-    height: DEFAULT_SIZE,
+    width: 250,
+    height: 250,
   },
   message: {
     marginTop: 16,

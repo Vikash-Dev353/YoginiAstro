@@ -1,32 +1,47 @@
 import { io, type Socket } from "socket.io-client";
 
-/**
- * Realtime / Socket.IO base only. REST API uses `src/services/api/client.ts` (`BASE_URL`).
- * Web env equivalent: `VITE_API_URL="https://meanmaestro.space/api/"`.
- */
-export const SOCKET_BASE_URL = "https://meanmaestro.space/api/";
+// ---------------------------------------------------------------------------
+// Endpoint (chat — separate from REST `apiClient` base URL)
+// ---------------------------------------------------------------------------
 
 /**
- * Socket.IO client expects an origin plus a `path` (default `/socket.io`).
- * With base `https://meanmaestro.space/api/`, the engine path is `/api/socket.io`.
+ * Server URL whose **pathname** becomes the Socket.IO **namespace** (e.g. `/api/dev/chat`).
+ * HTTP polling then hits the host at {@link SOCKET_IO_PATH}, not under this pathname.
+ *
+ * @see https://socket.io/docs/v4/client-api/#with-custom-path
  */
-function getIoUrlAndPath(): { url: string; path: string } {
-  const u = new URL(SOCKET_BASE_URL);
-  const prefix = u.pathname.replace(/\/$/, "");
-  return {
-    url: `${u.protocol}//${u.host}`,
-    path: prefix ? `${prefix}/socket.io` : "/socket.io",
-  };
-}
+export const SOCKET_SERVER_URL = "https://meanmaestro.space/api/dev/chat";
 
-/** Create a Socket.IO client wired to {@link SOCKET_BASE_URL}. */
+/**
+ * Engine.IO path on the **origin** host (default is `/socket.io`).
+ * Must match where the server mounts Socket.IO — not the same as namespace.
+ */
+export const SOCKET_IO_PATH = "/socket.io";
+
+/** @deprecated Use {@link SOCKET_SERVER_URL} — old name mixed up namespace vs engine path. */
+export const SOCKET_IO_ENGINE_URL = SOCKET_SERVER_URL;
+
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Low-level factory: connects to {@link SOCKET_SERVER_URL} with {@link SOCKET_IO_PATH}.
+ * Prefer {@link syncSocketWithSession} in `socketService.ts` for app usage.
+ */
 export function createSocketClient(
   options?: Parameters<typeof io>[1]
 ): Socket {
-  const { url, path } = getIoUrlAndPath();
-  return io(url, {
-    path,
-    transports: ["websocket"],
+  return io(SOCKET_SERVER_URL, {
+    path: SOCKET_IO_PATH,
+    /**
+     * Polling first, then upgrade — avoids generic "websocket error" on many RN
+     * devices/networks where raw WebSocket fails but HTTP long-polling works.
+     * Override via `options.transports` if the server is websocket-only.
+     */
+    transports: ["polling", "websocket"],
+    upgrade: true,
+    timeout: 20_000,
     ...options,
   });
 }

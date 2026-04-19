@@ -275,7 +275,8 @@ export function OrderScreen({ route, navigation }: Props) {
           profileImage: entry.senderImage,
         }));
 
-        setWaitlistData(items.length > 0 ? items : DUMMY_WAITLIST);
+        // setWaitlistData(items.length > 0 ? items : DUMMY_WAITLIST);
+        setWaitlistData(items);
       } catch (error) {
         if (!isMounted) {
           return;
