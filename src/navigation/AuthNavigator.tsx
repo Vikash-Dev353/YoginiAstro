@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { registerDeviceWithNotificationPermission } from '../services/device/registerDevice';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OtpVerificationScreen } from '../screens/auth/OtpVerificationScreen';
 import { PendingApprovalScreen } from '../screens/auth/PendingApprovalScreen';
@@ -30,6 +31,10 @@ export function AuthNavigator() {
     }
     return authEntryRoute;
   }, [authEntryRoute, pendingAdminApproval, pendingProfileCompletion]);
+
+  useEffect(() => {
+    registerDeviceWithNotificationPermission('astrologer').catch(() => {});
+  }, []);
 
   return (
     <Stack.Navigator

@@ -42,6 +42,35 @@ export function decodeMobileFromToken(token: string | null): string | null {
   }
 }
 
+/** For meanmaestro `attach-device` — prefers `userId`, then `id` / `sub` in JWT payload. */
+export function decodeUserIdFromToken(token: string | null): string | null {
+  if (!token || token.split('.').length < 2) return null;
+  const atobFn = (globalThis as { atob?: (s: string) => string }).atob;
+  if (typeof atobFn !== 'function') return null;
+  try {
+    const base64 = token.split('.')[1];
+    const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    const json = atobFn(padded);
+    const payload = JSON.parse(json) as {
+      userId?: string;
+      id?: string;
+      sub?: string;
+    };
+    const u =
+      payload.userId?.trim() ||
+      payload.id?.trim() ||
+      payload.sub?.trim() ||
+      '';
+    return u.length > 0 ? u : null;
+  } catch {
+    return null;
+  }
+}
+
 type User = {
   id: string;
   name: string;

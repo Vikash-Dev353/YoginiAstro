@@ -16,10 +16,12 @@ import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { AuthStackParamList } from "../../navigation/types";
 import type { VerifyOtpResponse } from "../../services/api/authApi";
+import { attachDeviceToUser } from "../../services/device/registerDevice";
 import { useAppDispatch } from "../../store/hooks";
 import {
   applyAuthGate,
   decodeAstroIdFromToken,
+  decodeUserIdFromToken,
   sendOtp,
   sendRegisterOtp,
   setAuthenticatedSession,
@@ -211,6 +213,16 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
           })
         ).unwrap();
       }
+
+      /** Register flow does not open main app yet — attach here. Login flow uses RootNavigator. */
+      if (flow === "register") {
+        const attachUserId =
+          userId || decodeUserIdFromToken(token) || "";
+        if (attachUserId) {
+          void attachDeviceToUser({ authToken: token, userId: attachUserId });
+        }
+      }
+
       setLoading(false);
     } catch (apiError) {
       setError(
