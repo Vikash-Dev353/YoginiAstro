@@ -54,7 +54,7 @@ export function logSocketConnectionRequest(params: {
     opts.auth = sanitizeAuthForLog(opts.auth);
   }
 
-  console.log("[Socket] connection request", {
+  console.log("[Socket] connection request1", {
     at: new Date().toISOString(),
     namespaceUrl: params.namespaceUrl,
     namespacePath,
@@ -72,18 +72,19 @@ export function logSocketConnectionRequest(params: {
 // ---------------------------------------------------------------------------
 
 /**
- * Server URL whose **pathname** becomes the Socket.IO **namespace** (e.g. `/api/dev/chat`).
- * HTTP polling then hits the host at {@link SOCKET_IO_PATH}, not under this pathname.
+ * Socket origin URL. Keep this at host root so client uses default namespace `/`.
+ * Custom Engine.IO route is configured via {@link SOCKET_IO_PATH}.
  *
- * @see https://socket.io/docs/v4/client-api/#with-custom-path
+ * @see https://socket.io/docs/v4/client-options/#path
  */
-export const SOCKET_SERVER_URL = "https://meanmaestro.space/api/dev/chat";
+export const SOCKET_SERVER_URL = "https://meanmaestro.space";
 
 /**
  * Engine.IO path on the **origin** host (default is `/socket.io`).
  * Must match where the server mounts Socket.IO — not the same as namespace.
  */
-export const SOCKET_IO_PATH = "/socket.io";
+export const SOCKET_IO_PATH = "/chat/socket.io";
+export const SOCKET_IO_FALLBACK_PATH = "/dev/chat/socket.io";
 
 /** @deprecated Use {@link SOCKET_SERVER_URL} — old name mixed up namespace vs engine path. */
 export const SOCKET_IO_ENGINE_URL = SOCKET_SERVER_URL;
@@ -99,14 +100,17 @@ export const SOCKET_IO_ENGINE_URL = SOCKET_SERVER_URL;
 export function createSocketClient(
   options?: Parameters<typeof io>[1]
 ): Socket {
+  const requestedPath = (
+    options as (Record<string, unknown> & { path?: string }) | undefined
+  )?.path;
   const mergedOptions: Record<string, unknown> = {
-    path: SOCKET_IO_PATH,
+    path: requestedPath || SOCKET_IO_PATH,
     /**
      * Polling first, then upgrade — avoids generic "websocket error" on many RN
      * devices/networks where raw WebSocket fails but HTTP long-polling works.
      * Override via `options.transports` if the server is websocket-only.
      */
-    transports: ["polling", "websocket"],
+    transports: ["websocket", "polling"],
     upgrade: true,
     timeout: 20_000,
     ...(options as Record<string, unknown> | undefined),
@@ -114,7 +118,7 @@ export function createSocketClient(
 
   logSocketConnectionRequest({
     namespaceUrl: SOCKET_SERVER_URL,
-    enginePath: SOCKET_IO_PATH,
+    enginePath: String(mergedOptions.path),
     mergedOptions: mergedOptions,
   });
 

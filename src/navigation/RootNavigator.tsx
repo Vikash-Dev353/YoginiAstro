@@ -4,10 +4,10 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { attachDeviceToUser } from '../services/device/registerDevice';
-import { syncSocketWithSession } from '../services/socket';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { bootstrapAuth, decodeAstroIdFromToken } from '../store/slices/authSlice';
 import { bootstrapLanguage } from '../store/slices/languageSlice';
+import { syncSocketSession } from '../store/slices/socketSlice';
 import { AppLoader } from '../components/common/AppLoader';
 
 const navigationTheme = {
@@ -67,12 +67,26 @@ export function RootNavigator() {
   }, [canEnterMainApp, token, astroId]);
 
   useEffect(() => {
-    if (canEnterMainApp && token && isAppForeground) {
-      syncSocketWithSession({ authToken: token });
+    const resolvedAstroId = astroId?.trim() || decodeAstroIdFromToken(token) || '';
+    if (token && resolvedAstroId && isAppForeground) {
+      dispatch(
+        syncSocketSession({
+          authToken: token,
+          astroId: resolvedAstroId,
+          reason: 'connect-ready',
+        }),
+      );
     } else {
-      syncSocketWithSession({ authToken: null });
+      const reason = !token
+        ? 'no-auth-token'
+        : !resolvedAstroId
+          ? 'no-astro-id'
+          : !isAppForeground
+            ? 'app-background'
+            : 'disconnect-fallback';
+      dispatch(syncSocketSession({ authToken: null, reason }));
     }
-  }, [canEnterMainApp, token, isAppForeground]);
+  }, [token, isAppForeground, astroId, dispatch]);
 
   if (isBootstrapping || isLanguageBootstrapping) {
     return <AppLoader />;

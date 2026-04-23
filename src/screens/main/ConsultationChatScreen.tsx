@@ -23,6 +23,21 @@ import { images } from "../../assets/images";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { OrderStackParamList } from "../../navigation/types";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import {
+  emitStopTyping,
+  emitTyping,
+  joinRoom,
+  leaveRoom,
+  requestChatHistory,
+  resetRoom,
+  selectMessages,
+  selectSocketState,
+  sendMessage,
+  setChatStarted,
+  setSocketChatDisconnect,
+  setSocketTimerStart,
+} from "../../store/slices/socketSlice";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "ConsultationChat">;
@@ -32,6 +47,8 @@ type ChatMessage = {
   text: string;
   isMine: boolean;
   createdAt: number;
+  isFile?: boolean;
+  fileUrl?: string;
 };
 
 const HEADER = "#632B27";
@@ -55,48 +72,49 @@ function formatSessionClock(totalSeconds: number): string {
 }
 
 function ConsultationChatScreenComponent({ navigation, route }: Props) {
-  const { customerName, roomId, kundaliPayload, customerImage } = route.params;
+  const { customerName, roomId, senderId, kundaliPayload, customerImage } =
+    route.params;
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const socketState = useAppSelector(selectSocketState);
+  const socketMessages = useAppSelector(selectMessages);
 
   const [elapsedSec, setElapsedSec] = useState(0);
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: "m1",
-      text: "Hello",
-      isMine: false,
-      createdAt: Date.now() - 120_000,
-    },
-    {
-      id: "m2",
-      text: "Hello",
-      isMine: true,
-      createdAt: Date.now() - 110_000,
-    },
-    {
-      id: "m3",
-      text: "When we can start the chat?",
-      isMine: false,
-      createdAt: Date.now() - 100_000,
-    },
-    {
-      id: "m4",
-      text: "We can start now",
-      isMine: true,
-      createdAt: Date.now() - 90_000,
-    },
-  ]);
 
   useEffect(() => {
     const id = setInterval(() => setElapsedSec((x) => x + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (!senderId) {
+      return;
+    }
+    joinRoom({
+      senderName: "",
+      receiverMobile: senderId,
+    });
+    requestChatHistory(roomId);
+    dispatch(setChatStarted(true));
+
+    return () => {
+      leaveRoom(roomId);
+      dispatch(resetRoom());
+      dispatch(setSocketTimerStart(false));
+      dispatch(setSocketChatDisconnect(false));
+    };
+  }, [dispatch, roomId, senderId]);
+
   const onEnd = useCallback(() => {
+    leaveRoom(roomId);
+    dispatch(setSocketTimerStart(false));
+    dispatch(setSocketChatDisconnect(false));
+    dispatch(resetRoom());
     navigation.goBack();
-  }, [navigation]);
+  }, [dispatch, navigation, roomId]);
 
   const onOpenKundli = useCallback(() => {
     navigation.navigate("ViewKundli", {
@@ -110,19 +128,46 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `local-${Date.now()}`,
-        text,
-        isMine: true,
-        createdAt: Date.now(),
-      },
-    ]);
+    dispatch(
+      sendMessage({
+        sender: "astrologer",
+        roomId,
+        message: text,
+        timestamp: new Date().toISOString(),
+        isFile: false,
+      })
+    );
+    emitStopTyping(roomId);
     requestAnimationFrame(() =>
       listRef.current?.scrollToEnd({ animated: true })
     );
-  }, [draft]);
+  }, [dispatch, draft, roomId]);
+
+  const messages = useMemo<ChatMessage[]>(() => {
+    return socketMessages.map((msg, index) => {
+      const ts = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+      return {
+        id: `${msg.roomId || roomId}-${index}-${msg.timestamp || ""}`,
+        text: typeof msg.message === "string" ? msg.message : msg.fileName || "",
+        isMine: msg.sender === "astrologer",
+        createdAt: Number.isNaN(ts) ? Date.now() : ts,
+        isFile: Boolean(msg.isFile),
+        fileUrl: msg.fileUrl,
+      };
+    });
+  }, [socketMessages, roomId]);
+
+  useEffect(() => {
+    requestAnimationFrame(() =>
+      listRef.current?.scrollToEnd({ animated: true })
+    );
+  }, [messages.length, socketState.isTyping]);
+
+  useEffect(() => {
+    if (socketState.chatDisconnect) {
+      navigation.goBack();
+    }
+  }, [socketState.chatDisconnect, navigation]);
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
@@ -140,11 +185,17 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               mine ? styles.bubbleMine : styles.bubbleTheirs,
             ]}
           >
-            <Text
-              style={[styles.bubbleText, mine && styles.bubbleTextMine]}
-            >
-              {item.text}
-            </Text>
+            {item.isFile && item.fileUrl ? (
+              <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                {item.text || item.fileUrl}
+              </Text>
+            ) : (
+              <Text
+                style={[styles.bubbleText, mine && styles.bubbleTextMine]}
+              >
+                {item.text}
+              </Text>
+            )}
             <View style={styles.bubbleMeta}>
               <Text
                 style={[styles.bubbleTime, mine && styles.bubbleTimeMine]}
@@ -241,7 +292,14 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               placeholder={t("chat.typeMessage")}
               placeholderTextColor="#B0ACAC"
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(value) => {
+                setDraft(value);
+                if (value.trim().length > 0) {
+                  emitTyping(roomId);
+                } else {
+                  emitStopTyping(roomId);
+                }
+              }}
               multiline={false}
             />
             <Pressable

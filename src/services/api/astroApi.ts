@@ -183,14 +183,28 @@ export type GenerateKundaliResponse = {
 };
 
 export type WaitlistApiItem = {
-  from: string;
-  senderName: string;
-  senderImage: string | null;
-  message: string;
-  roomId: string;
-  requestedAt: string;
+  senderId?: string;
+  from?: string;
+  senderName?: string;
+  senderImage?: string | null;
+  message?: string;
+  roomId?: string;
+  requestedAt?: string | number;
+  timestamp?: string | number;
   kundliUrl?: string;
   kundaliData?: Record<string, unknown>;
+  userData?: {
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImage?: string;
+  };
+  balance?: {
+    balance?: number;
+  };
+  astroData?: {
+    price?: number;
+  };
   /** Payload to call generate-kundali when user opens View Kundli */
   generateKundaliPayload?: GenerateKundaliPayload;
 };
@@ -201,6 +215,96 @@ export type WaitlistResponse = {
   waitingList: WaitlistApiItem[];
   message?: string;
 };
+
+type WaitlistRawResponse =
+  | WaitlistResponse
+  | {
+      data?: WaitlistResponse;
+      status?: string;
+      message?: string;
+      waitingCount?: number;
+      waitingList?: WaitlistApiItem[];
+    };
+
+export function parseKundliUrlToPayload(
+  kundliUrl?: string,
+): GenerateKundaliPayload | undefined {
+  if (!kundliUrl || kundliUrl.trim().length === 0) {
+    return undefined;
+  }
+
+  const search = kundliUrl.startsWith("?") ? kundliUrl : `?${kundliUrl}`;
+  const params = new URLSearchParams(search);
+  const fullName = params.get("full_name");
+  const day = Number(params.get("day"));
+  const month = Number(params.get("month"));
+  const year = Number(params.get("year"));
+  const hour = Number(params.get("hour"));
+  const minute = Number(params.get("min"));
+  const gender = params.get("gender");
+  const birthPlace = params.get("birthPlace");
+  const lat = Number(params.get("lat"));
+  const lon = Number(params.get("lon"));
+
+  if (
+    !fullName ||
+    !birthPlace ||
+    !gender ||
+    Number.isNaN(day) ||
+    Number.isNaN(month) ||
+    Number.isNaN(year) ||
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    Number.isNaN(lat) ||
+    Number.isNaN(lon)
+  ) {
+    return undefined;
+  }
+
+  return {
+    full_name: fullName,
+    day,
+    month,
+    year,
+    hour,
+    min: minute,
+    gender,
+    birthPlace,
+    selectedPlace: {
+      display_name: birthPlace,
+      lat,
+      lon,
+    },
+    chart_type: params.get("chart_type") || "north",
+    tzone: params.get("tzone") || "5.5",
+    lang: params.get("lang") || "en",
+  };
+}
+
+function normalizeWaitlistResponse(raw: WaitlistRawResponse): WaitlistResponse {
+  const dataBlock =
+    raw && typeof raw === "object" && "data" in raw && raw.data
+      ? raw.data
+      : undefined;
+  const source = dataBlock ?? raw;
+  return {
+    status:
+      (source as WaitlistResponse)?.status ??
+      (raw as WaitlistResponse)?.status ??
+      "Failed",
+    waitingCount: Number(
+      (source as WaitlistResponse)?.waitingCount ??
+        (raw as WaitlistResponse)?.waitingCount ??
+        0,
+    ),
+    waitingList: Array.isArray((source as WaitlistResponse)?.waitingList)
+      ? ((source as WaitlistResponse).waitingList ?? [])
+      : [],
+    message:
+      (source as WaitlistResponse)?.message ??
+      (raw as WaitlistResponse)?.message,
+  };
+}
 
 export type WalletChartPoint = { label: string; value: number };
 
@@ -379,8 +483,9 @@ export const astroApi = {
     }
 
     const request = apiService
-      .post<WaitlistResponse>(API_ROUTES.auth.waitlist(cacheKey))
-      .then(data => {
+      .post<WaitlistRawResponse>(API_ROUTES.auth.waitlist(cacheKey))
+      .then(raw => {
+        const data = normalizeWaitlistResponse(raw);
         waitlistCache.set(cacheKey, { fetchedAt: Date.now(), data });
         return data;
       })

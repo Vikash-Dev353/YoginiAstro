@@ -60,6 +60,12 @@ function isFirebaseNativeReady(): boolean {
   }
 }
 
+function maskSensitiveToken(value: string): string {
+  if (!value) return "(empty)";
+  if (value.length <= 18) return `*** (len=${value.length})`;
+  return `${value.slice(0, 10)}...${value.slice(-8)} (len=${value.length})`;
+}
+
 /** Native Firebase init can lag behind JS; wait before first getToken. */
 async function waitForFirebaseApp(maxMs = 8000): Promise<boolean> {
   const step = 250;
@@ -154,7 +160,7 @@ export async function registerDeviceWithNotificationPermission(
     const deviceId = await getOrCreateDeviceId();
     const fcmToken = await getFcmTokenWithRetry();
     const token = fcmToken ?? "";
-    const device = "mobile"
+    const device = "mobile";
 
     if (!fcmToken) {
       console.warn(
@@ -162,8 +168,14 @@ export async function registerDeviceWithNotificationPermission(
       );
     }
 
-    const body = { deviceId, token, role, device};
-    console.log("[device] register-device body", body);
+    const body = { deviceId, token, role, device };
+    console.log("[device] register-device body", {
+      deviceId,
+      role,
+      device,
+      hasFcmToken: Boolean(fcmToken),
+      tokenPreview: maskSensitiveToken(token),
+    });
 
     const { status, data } = await axios.post(REGISTER_DEVICE_URL, body, {
       headers: { "Content-Type": "application/json" },

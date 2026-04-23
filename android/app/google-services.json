@@ -1,0 +1,30 @@
+
+{
+  "project_info": {
+    "project_number": "996254120513",
+    "project_id": "ramanyoginitest",
+    "storage_bucket": "ramanyoginitest.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:996254120513:android:5d55c512314c8ba4d1a4c0",
+        "android_client_info": {
+          "package_name": "com.yoginiastro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsa4MTzNz4XgxatpeYEAftNo6nT5F2JD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

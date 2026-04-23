@@ -21,6 +21,7 @@ export type OrderStackParamList = {
   ConsultationChat: {
     customerName: string;
     roomId: string;
+    senderId?: string;
     kundaliPayload?: GenerateKundaliPayload;
     customerImage?: string | null;
   };

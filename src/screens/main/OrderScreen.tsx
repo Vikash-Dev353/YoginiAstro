@@ -19,11 +19,19 @@ import { OrderStackParamList } from "../../navigation/types";
 import {
   astroApi,
   type CallHistoryItem,
-  type ConsultationItem,
   type GenerateKundaliPayload,
+  type ConsultationItem,
+  parseKundliUrlToPayload,
 } from "../../services/api/astroApi";
 import { decodeAstroIdFromToken } from "../../store/slices/authSlice";
-import { useAppSelector } from "../../store/hooks";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import {
+  acceptChat,
+  rejectChat,
+  selectChatRequests,
+  setAstroChatData,
+  setSocketChatDisconnect,
+} from "../../store/slices/socketSlice";
 import { normalizeFont, wp } from "../../utils/responsive";
 
 type OrderTab = "Waitlist" | "Voice Call" | "Chat" | "Pooja Booking";
@@ -33,9 +41,12 @@ type WaitlistItem = {
   name: string;
   message: string;
   timeLabel: string;
+  from?: string;
   kundliUrl?: string;
   generateKundaliPayload?: GenerateKundaliPayload;
   profileImage?: string | null;
+  userBalance?: number;
+  astroPrice?: number;
 };
 
 type VoiceCallItem = {
@@ -132,7 +143,7 @@ const formatChatDate = (createdAt?: string): string => {
     .replace(",", " |");
 };
 
-const getRequestedTimeLabel = (requestedAt?: string) => {
+const getRequestedTimeLabel = (requestedAt?: string | number) => {
   if (!requestedAt) {
     return "Now";
   }
@@ -158,10 +169,13 @@ const getRequestedTimeLabel = (requestedAt?: string) => {
 };
 
 export function OrderScreen({ route, navigation }: Props) {
+  const dispatch = useAppDispatch();
   const { t, appLanguage } = useTranslation();
   const token = useAppSelector((state) => state.auth.token);
   const astroIdFromStore = useAppSelector((state) => state.auth.astroId);
   const tabs: OrderTab[] = ["Waitlist", "Voice Call", "Chat", "Pooja Booking"];
+  const wantsToChatFallback =
+    appLanguage === "hi" ? "आपसे चैट करना चाहता है।" : "Wants to chat with you.";
 
   const astroId: string =
     astroIdFromStore?.trim().toUpperCase() ||
@@ -192,6 +206,7 @@ export function OrderScreen({ route, navigation }: Props) {
   const [isCallHistoryLoading, setIsCallHistoryLoading] = useState(false);
   const [callHistoryError, setCallHistoryError] = useState<string | null>(null);
   const [orderFocusKey, setOrderFocusKey] = useState(0);
+  const socketChatRequests = useAppSelector(selectChatRequests);
 
   useEffect(() => {
     if (route.params?.initialTab) {
@@ -211,11 +226,6 @@ export function OrderScreen({ route, navigation }: Props) {
     }
 
     let isMounted = true;
-    const wantsToChatFallback =
-      appLanguage === "hi"
-        ? "आपसे चैट करना चाहता है।"
-        : "Wants to chat with you.";
-
     const loadWaitlist = async () => {
       try {
         setIsWaitlistLoading(true);
@@ -227,15 +237,29 @@ export function OrderScreen({ route, navigation }: Props) {
           return;
         }
 
-        const items = (response.waitingList || []).map((entry, index) => ({
-          id: entry.roomId || `${entry.from}-${index}`,
-          name: entry.senderName || entry.from || "Unknown",
-          message: entry.message || wantsToChatFallback,
-          timeLabel: getRequestedTimeLabel(entry.requestedAt),
-          kundliUrl: entry.kundliUrl,
-          generateKundaliPayload: entry.generateKundaliPayload,
-          profileImage: entry.senderImage,
-        }));
+        const items = (response.waitingList || []).map((entry, index) => {
+          const from = entry.senderId || entry.from;
+          const fullName =
+            entry.userData?.fullName ||
+            [entry.userData?.firstName, entry.userData?.lastName]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+          const generateKundaliPayload =
+            entry.generateKundaliPayload || parseKundliUrlToPayload(entry.kundliUrl);
+          return {
+            id: entry.roomId || `${from || "unknown"}-${index}`,
+            from,
+            name: fullName || entry.senderName || from || "Unknown",
+            message: entry.message || wantsToChatFallback,
+            timeLabel: getRequestedTimeLabel(entry.requestedAt || entry.timestamp),
+            kundliUrl: entry.kundliUrl,
+            generateKundaliPayload,
+            profileImage: entry.userData?.profileImage ?? entry.senderImage,
+            userBalance: entry.balance?.balance,
+            astroPrice: entry.astroData?.price,
+          };
+        });
 
         setWaitlistData(items);
       } catch (error) {
@@ -376,9 +400,33 @@ export function OrderScreen({ route, navigation }: Props) {
         return POOJA_DATA;
       case "Waitlist":
       default:
+        if (socketChatRequests.length > 0) {
+          return socketChatRequests.map((request, index) => ({
+            id: request.roomId || `${request.senderId || request.from}-${index}`,
+            from: request.senderId || request.from,
+            name:
+              request.userData?.fullName ||
+              request.senderName ||
+              "Unknown",
+            message: request.message || wantsToChatFallback,
+            timeLabel: getRequestedTimeLabel(request.requestedAt),
+            kundliUrl: request.kundliUrl,
+            generateKundaliPayload: parseKundliUrlToPayload(request.kundliUrl),
+            profileImage: request.userData?.profileImage ?? request.senderImage,
+            userBalance: request.balance?.balance,
+            astroPrice: request.astroData?.price,
+          }));
+        }
         return waitlistData;
     }
-  }, [activeTab, waitlistData, chatDataForList, callDataForList]);
+  }, [
+    activeTab,
+    waitlistData,
+    chatDataForList,
+    callDataForList,
+    socketChatRequests,
+    wantsToChatFallback,
+  ]);
 
   const renderMetricRow = (rate: string, duration: string, amount: string) => (
     <View style={styles.metricRow}>
@@ -435,20 +483,51 @@ export function OrderScreen({ route, navigation }: Props) {
           <View style={styles.waitlistActions}>
             <Pressable
               style={[styles.actionButton, styles.acceptButton]}
-              onPress={() =>
+              onPress={() => {
+                if (waitlistItem.from && waitlistItem.id) {
+                  dispatch(setSocketChatDisconnect(false));
+                  dispatch(
+                    setAstroChatData({
+                      from: waitlistItem.from,
+                      senderName: waitlistItem.name,
+                      userImage: waitlistItem.profileImage,
+                      roomId: waitlistItem.id,
+                      kundliUrl: waitlistItem.kundliUrl,
+                      userBalance: waitlistItem.userBalance,
+                      astroPrice: waitlistItem.astroPrice,
+                    })
+                  );
+                  dispatch(
+                    acceptChat({
+                      from: waitlistItem.from,
+                      roomId: waitlistItem.id,
+                    })
+                  );
+                }
                 navigation.navigate("ConsultationChat", {
                   customerName: waitlistItem.name,
                   roomId: waitlistItem.id,
+                  senderId: waitlistItem.from,
                   kundaliPayload: waitlistItem.generateKundaliPayload,
                   customerImage: waitlistItem.profileImage,
-                })
-              }
+                });
+              }}
             >
               <Text style={styles.actionButtonText}>{t("common.accept")}</Text>
             </Pressable>
-            <Pressable style={[styles.actionButton, styles.rejectButton]} onPress={()=>{
-              navigation.goBack();
-            }}>
+            <Pressable
+              style={[styles.actionButton, styles.rejectButton]}
+              onPress={() => {
+                if (waitlistItem.from && waitlistItem.id) {
+                  dispatch(
+                    rejectChat({
+                      from: waitlistItem.from,
+                      roomId: waitlistItem.id,
+                    })
+                  );
+                }
+              }}
+            >
               <Text style={styles.actionButtonText}>{t("common.reject")}</Text>
             </Pressable>
           </View>
