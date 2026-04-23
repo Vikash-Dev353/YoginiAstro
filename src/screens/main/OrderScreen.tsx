@@ -72,46 +72,6 @@ type PoojaBookingItem = {
 
 type OrderListItem = WaitlistItem | VoiceCallItem | ChatItem | PoojaBookingItem;
 
-/** Static dummy waitlist for testing navigation & Kundli when API has no data */
-const DUMMY_WAITLIST: WaitlistItem[] = [
-  {
-    id: "dummy-1",
-    name: "Sachin Singh",
-    message: "Wants to chat with you.",
-    timeLabel: "Now",
-    generateKundaliPayload: {
-      full_name: "sachin singh",
-      day: 3,
-      month: 3,
-      year: 2026,
-      hour: 1,
-      min: 0,
-      gender: "male",
-      birthPlace: "Abhayapuri",
-      selectedPlace: {
-        display_name: "Abhayapuri",
-        lat: 26.32255,
-        lon: 90.68526,
-      },
-      chart_type: "north",
-      tzone: "5.5",
-      lang: "en",
-    },
-  },
-  {
-    id: "dummy-2",
-    name: "Priya Sharma",
-    message: "कुंडली देखकर बात करना चाहती हूं।",
-    timeLabel: "5 min ago",
-  },
-  {
-    id: "dummy-3",
-    name: "Rahul Verma",
-    message: "Wants to chat with you.",
-    timeLabel: "12 min ago",
-  },
-];
-
 // const POOJA_DATA: PoojaBookingItem[] = [
 //   {
 //     id: "p1",
@@ -260,7 +220,9 @@ export function OrderScreen({ route, navigation }: Props) {
       try {
         setIsWaitlistLoading(true);
         setWaitlistError(null);
-        const response = await astroApi.getWaitlist(astroId);
+        const response = await astroApi.getWaitlist(astroId, {
+          forceRefresh: true,
+        });
         if (!isMounted) {
           return;
         }
@@ -275,7 +237,6 @@ export function OrderScreen({ route, navigation }: Props) {
           profileImage: entry.senderImage,
         }));
 
-        // setWaitlistData(items.length > 0 ? items : DUMMY_WAITLIST);
         setWaitlistData(items);
       } catch (error) {
         if (!isMounted) {
@@ -284,10 +245,10 @@ export function OrderScreen({ route, navigation }: Props) {
         setWaitlistError(
           (error as { message?: string })?.message ||
             (appLanguage === "hi"
-              ? "वेटलिस्ट लोड नहीं हो पाई। (डमी डेटा दिख रहा है)"
-              : "Unable to load waitlist. (Showing dummy data)")
+              ? "वेटलिस्ट लोड नहीं हो पाई।"
+              : "Unable to load waitlist.")
         );
-        setWaitlistData(DUMMY_WAITLIST);
+        setWaitlistData([]);
       } finally {
         if (isMounted) {
           setIsWaitlistLoading(false);

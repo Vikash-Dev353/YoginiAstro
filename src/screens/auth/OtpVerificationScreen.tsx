@@ -21,7 +21,6 @@ import { useAppDispatch } from "../../store/hooks";
 import {
   applyAuthGate,
   decodeAstroIdFromToken,
-  decodeUserIdFromToken,
   sendOtp,
   sendRegisterOtp,
   setAuthenticatedSession,
@@ -216,10 +215,9 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
 
       /** Register flow does not open main app yet — attach here. Login flow uses RootNavigator. */
       if (flow === "register") {
-        const attachUserId =
-          userId || decodeUserIdFromToken(token) || "";
-        if (attachUserId) {
-          void attachDeviceToUser({ authToken: token, userId: attachUserId });
+        const attachAstroId = resolvedAstroId || decodeAstroIdFromToken(token) || "";
+        if (attachAstroId) {
+          void attachDeviceToUser({ authToken: token, astroId: attachAstroId });
         }
       }
 

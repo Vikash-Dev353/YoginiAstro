@@ -7,6 +7,10 @@ export type GetOnlinePayload = {
   astroId: string;
 };
 
+export type GetWaitlistOptions = {
+  forceRefresh?: boolean;
+};
+
 export type SetOnlinePayload = {
   astroId: string;
   chatOnline: boolean;
@@ -361,15 +365,16 @@ export const astroApi = {
     apiService.post<OnlineStatusResponse>(API_ROUTES.auth.getOnline, payload),
   setOnline: async (payload: SetOnlinePayload) =>
     apiService.post<OnlineStatusResponse>(API_ROUTES.auth.setOnline, payload),
-  getWaitlist: async (astroId: string) => {
+  getWaitlist: async (astroId: string, options?: GetWaitlistOptions) => {
     const cacheKey = astroId.trim().toUpperCase();
+    const shouldUseCache = !options?.forceRefresh;
     const cached = waitlistCache.get(cacheKey);
-    if (cached && Date.now() - cached.fetchedAt < WAITLIST_TTL_MS) {
+    if (shouldUseCache && cached && Date.now() - cached.fetchedAt < WAITLIST_TTL_MS) {
       return cached.data;
     }
 
     const inFlight = waitlistInFlight.get(cacheKey);
-    if (inFlight) {
+    if (shouldUseCache && inFlight) {
       return inFlight;
     }
 

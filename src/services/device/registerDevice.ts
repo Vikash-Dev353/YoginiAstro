@@ -154,6 +154,7 @@ export async function registerDeviceWithNotificationPermission(
     const deviceId = await getOrCreateDeviceId();
     const fcmToken = await getFcmTokenWithRetry();
     const token = fcmToken ?? "";
+    const device = "mobile"
 
     if (!fcmToken) {
       console.warn(
@@ -161,7 +162,7 @@ export async function registerDeviceWithNotificationPermission(
       );
     }
 
-    const body = { deviceId, token, role };
+    const body = { deviceId, token, role, device};
     console.log("[device] register-device body", body);
 
     const { status, data } = await axios.post(REGISTER_DEVICE_URL, body, {
@@ -182,23 +183,23 @@ export async function registerDeviceWithNotificationPermission(
 }
 
 /**
- * Links the install `deviceId` (same as register-device) to a logged-in `userId`.
+ * Links the install `deviceId` (same as register-device) to a logged-in `astroId`.
  * Requires a valid Bearer token (e.g. after OTP verify or session restore).
  */
 export async function attachDeviceToUser(params: {
   authToken: string;
-  userId: string;
+  astroId: string;
 }): Promise<void> {
   const authToken = params.authToken?.trim();
-  const userId = params.userId?.trim();
-  if (!authToken || !userId) {
-    console.warn("[device] attach-device skipped: missing authToken or userId");
+  const astroId = params.astroId?.trim();
+  if (!authToken || !astroId) {
+    console.warn("[device] attach-device skipped: missing authToken or astroId");
     return;
   }
 
   try {
     const deviceId = await getOrCreateDeviceId();
-    const body = { deviceId, userId };
+    const body = { deviceId, astroId };
     console.log("[device] attach-device body", body);
 
     const { status, data } = await axios.post(ATTACH_DEVICE_URL, body, {

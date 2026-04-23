@@ -12,7 +12,7 @@ const DEBUG = __DEV__;
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {
-    console.log("[Socket]1", ...args);
+    console.log("[Socket]", ...args);
   }
 }
 
@@ -24,7 +24,11 @@ let socket: Socket | null = null;
 
 function wireLifecycleLogging(client: Socket) {
   client.on("connect", () => {
-    debugLog("connected", client.id);
+    debugLog("connected", {
+      socketId: client.id,
+      /** Which transport won after polling / upgrade. */
+      transport: client.io.engine?.transport?.name,
+    });
   });
   client.on("disconnect", (reason) => {
     debugLog("disconnected", reason);

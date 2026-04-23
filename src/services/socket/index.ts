@@ -14,4 +14,5 @@ export {
   SOCKET_IO_PATH,
   SOCKET_SERVER_URL,
   createSocketClient,
+  logSocketConnectionRequest,
 } from "./socketClient";

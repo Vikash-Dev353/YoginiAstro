@@ -6,7 +6,7 @@ import { MainTabNavigator } from './MainTabNavigator';
 import { attachDeviceToUser } from '../services/device/registerDevice';
 import { syncSocketWithSession } from '../services/socket';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { bootstrapAuth, decodeUserIdFromToken } from '../store/slices/authSlice';
+import { bootstrapAuth, decodeAstroIdFromToken } from '../store/slices/authSlice';
 import { bootstrapLanguage } from '../store/slices/languageSlice';
 import { AppLoader } from '../components/common/AppLoader';
 
@@ -35,7 +35,7 @@ export function RootNavigator() {
     state => state.language.isBootstrapping,
   );
   const token = useAppSelector(state => state.auth.token);
-  const user = useAppSelector(state => state.auth.user);
+  const astroId = useAppSelector(state => state.auth.astroId);
 
   const [appState, setAppState] = useState<AppStateStatus>(() =>
     AppState.currentState,
@@ -59,12 +59,12 @@ export function RootNavigator() {
     if (!canEnterMainApp || !token) {
       return;
     }
-    const userId = user?.id?.trim() || decodeUserIdFromToken(token) || '';
-    if (!userId) {
+    const attachAstroId = astroId?.trim() || decodeAstroIdFromToken(token) || '';
+    if (!attachAstroId) {
       return;
     }
-    void attachDeviceToUser({ authToken: token, userId });
-  }, [canEnterMainApp, token, user?.id]);
+    void attachDeviceToUser({ authToken: token, astroId: attachAstroId });
+  }, [canEnterMainApp, token, astroId]);
 
   useEffect(() => {
     if (canEnterMainApp && token && isAppForeground) {
