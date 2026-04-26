@@ -316,6 +316,8 @@ export const syncSocketSession =
     });
 
     socket.on("start-timer", () => {
+
+      console.log("start-timer==>>>>");
       dispatch(setTimerStart(true));
     });
 
@@ -382,9 +384,11 @@ export const rejectChat = (params: { from: string; roomId: string }) => (dispatc
 };
 
 export const leaveRoom = (roomId: string) => {
+  console.log("leaveRoom==>>>>", roomId);
   const socket = getSocket();
   if (!socket || !roomId) return;
   socket.emit("leave-room", { roomId });
+  console.log("leaveRoom==>>>>", roomId);
 };
 
 export const emitTyping = (roomId: string) => {

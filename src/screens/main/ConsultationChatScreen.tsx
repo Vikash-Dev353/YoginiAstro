@@ -38,6 +38,10 @@ import { images } from "../../assets/images";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { OrderStackParamList } from "../../navigation/types";
+import {
+  astroApi,
+  getAstrologerFromOnlineResponse,
+} from "../../services/api/astroApi";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   emitStopTyping,
@@ -143,22 +147,49 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const socketState = useAppSelector(selectSocketState);
   const socketMessages = useAppSelector(selectMessages);
+  const token = useAppSelector((state) => state.auth.token);
+  const astroId = useAppSelector((state) => state.auth.astroId);
 
-  const [elapsedSec, setElapsedSec] = useState(0);
+  const [remainingSec, setRemainingSec] = useState(0);
   const [draft, setDraft] = useState("");
   const [isSendingAttachment, setIsSendingAttachment] = useState(false);
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
+  const [astrologerImageUri, setAstrologerImageUri] = useState<string | null>(null);
+  const hasShownDisconnectAlertRef = useRef(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
+  const initialRemainingSec = useMemo(() => {
+    const chatData = socketState.astroChatData as
+      | { userBalance?: number; astroPrice?: number }
+      | null;
+    const balance = Number(chatData?.userBalance ?? 0);
+    const pricePerMinute = Number(chatData?.astroPrice ?? 0);
+    if (!Number.isFinite(balance) || !Number.isFinite(pricePerMinute) || pricePerMinute <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.floor((balance / pricePerMinute) * 60));
+  }, [socketState.astroChatData]);
+
   useEffect(() => {
-    const id = setInterval(() => setElapsedSec((x) => x + 1), 1000);
+    setRemainingSec(initialRemainingSec);
+  }, [initialRemainingSec, roomId]);
+
+  useEffect(() => {
+    const shouldRunCountdown = socketState.timerStart;
+    if (!shouldRunCountdown || remainingSec <= 0) {
+      return;
+    }
+    const id = setInterval(() => {
+      setRemainingSec((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [remainingSec, socketState.timerStart]);
 
   useEffect(() => {
     if (!senderId) {
       return;
     }
+    hasShownDisconnectAlertRef.current = false;
     joinRoom({
       senderName: "",
       receiverMobile: senderId,
@@ -379,10 +410,61 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   }, [isUserTyping, messages.length]);
 
   useEffect(() => {
-    if (socketState.chatDisconnect) {
-      navigation.goBack();
+    if (hasShownDisconnectAlertRef.current) {
+      return;
     }
-  }, [socketState.chatDisconnect, navigation]);
+
+    if (socketState.chatDisconnect) {
+      hasShownDisconnectAlertRef.current = true;
+      Alert.alert(
+        "Chat Disconnected",
+        "The user has left the chat.",
+        [{ text: "OK", onPress: onEnd }],
+        { cancelable: false }
+      );
+      return;
+    }
+
+  }, [onEnd, socketState.chatDisconnect]);
+
+  useEffect(() => {
+    const resolvedAstroId = astroId?.trim();
+    if (!token || !resolvedAstroId) {
+      return;
+    }
+    let active = true;
+    const loadAstrologerImage = async () => {
+      try {
+        const response = await astroApi.getOnline({ astroId: resolvedAstroId });
+        const astrologer = getAstrologerFromOnlineResponse(response);
+        const profileUri = astrologer?.profileImage?.trim();
+        if (!active) return;
+        setAstrologerImageUri(profileUri && profileUri.length > 0 ? profileUri : null);
+      } catch {
+        if (active) {
+          setAstrologerImageUri(null);
+        }
+      }
+    };
+    loadAstrologerImage();
+    return () => {
+      active = false;
+    };
+  }, [astroId, token]);
+
+  const avatarSource = useMemo(() => {
+    if (customerImage && customerImage.trim().length > 0) {
+      return { uri: customerImage.trim() };
+    }
+    return images.iconamoonProfileCircleFill;
+  }, [customerImage]);
+
+  const astrologerAvatarSource = useMemo(() => {
+    if (astrologerImageUri) {
+      return { uri: astrologerImageUri };
+    }
+    return images.iconamoonProfileCircleFill;
+  }, [astrologerImageUri]);
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
@@ -394,6 +476,9 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             mine ? styles.bubbleRowMine : styles.bubbleRowTheirs,
           ]}
         >
+          {!mine ? (
+            <Image source={avatarSource} style={styles.bubbleAvatar} resizeMode="cover" />
+          ) : null}
           <View
             style={[
               styles.bubble,
@@ -429,18 +514,18 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               )}
             </View>
           </View>
+          {mine ? (
+            <Image
+              source={astrologerAvatarSource}
+              style={styles.bubbleAvatar}
+              resizeMode="cover"
+            />
+          ) : null}
         </View>
       );
     },
-    [openAttachmentFile]
+    [astrologerAvatarSource, avatarSource, openAttachmentFile]
   );
-
-  const avatarSource = useMemo(() => {
-    if (customerImage && customerImage.trim().length > 0) {
-      return { uri: customerImage.trim() };
-    }
-    return images.iconamoonProfileCircleFill;
-  }, [customerImage]);
 
   return (
     <View style={styles.root}>
@@ -456,7 +541,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               {customerName}
             </Text>
             <Text style={styles.headerTimer}>
-              {formatSessionClock(elapsedSec)}
+              {formatSessionClock(remainingSec)}
             </Text>
           </View>
         </View>
@@ -724,12 +809,21 @@ const styles = StyleSheet.create({
   bubbleRow: {
     marginBottom: 12,
     width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
   },
   bubbleRowMine: {
-    alignItems: "flex-end",
+    justifyContent: "flex-end",
   },
   bubbleRowTheirs: {
-    alignItems: "flex-start",
+    justifyContent: "flex-start",
+  },
+  bubbleAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E8D5C4",
   },
   bubble: {
     maxWidth: "82%",
