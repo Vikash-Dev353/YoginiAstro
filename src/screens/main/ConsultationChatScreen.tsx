@@ -28,6 +28,7 @@ import {
   launchImageLibrary,
   type Asset,
 } from "react-native-image-picker";
+import AudioRecorderPlayer from "react-native-audio-recorder-player";
 import {
   errorCodes as documentPickerErrorCodes,
   isErrorWithCode as isDocumentPickerError,
@@ -205,8 +206,11 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const [isSendingAttachment, setIsSendingAttachment] = useState(false);
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const [astrologerImageUri, setAstrologerImageUri] = useState<string | null>(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingSec, setRecordingSec] = useState(0);
   const hasShownDisconnectAlertRef = useRef(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const audioRecorderRef = useRef(new AudioRecorderPlayer());
 
   const initialRemainingSec = useMemo(() => {
     const chatData = socketState.astroChatData as
@@ -439,6 +443,63 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     [sendAttachment]
   );
 
+  const startAudioRecording = useCallback(async () => {
+    try {
+      if (Platform.OS === "android") {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+        );
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            "Permission Required",
+            "Microphone permission is required to record audio."
+          );
+          return;
+        }
+      }
+
+      const outputPath = await audioRecorderRef.current.startRecorder();
+      if (!outputPath) {
+        Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to start recorder.");
+        return;
+      }
+
+      audioRecorderRef.current.addRecordBackListener((event: { currentPosition: number }) => {
+        const nextSec = Math.floor((event.currentPosition || 0) / 1000);
+        setRecordingSec(nextSec);
+      });
+
+      setRecordingSec(0);
+      setIsRecordingAudio(true);
+    } catch {
+      Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to start recorder.");
+    }
+  }, []);
+
+  const stopAudioRecording = useCallback(async () => {
+    try {
+      const recordedUri = await audioRecorderRef.current.stopRecorder();
+      audioRecorderRef.current.removeRecordBackListener();
+      setIsRecordingAudio(false);
+      setRecordingSec(0);
+
+      if (!recordedUri) {
+        Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to save recording.");
+        return;
+      }
+
+      await sendAttachment({
+        uri: recordedUri,
+        name: `recording-${Date.now()}.m4a`,
+        type: "audio/m4a",
+      });
+    } catch {
+      setIsRecordingAudio(false);
+      setRecordingSec(0);
+      Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to stop recorder.");
+    }
+  }, [sendAttachment]);
+
   const pickFromGallery = useCallback(async () => {
     try {
       const result = await launchImageLibrary({
@@ -463,8 +524,20 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   }, []);
 
   const closeAttachmentMenu = useCallback(() => {
+    if (isRecordingAudio) {
+      return;
+    }
     setIsAttachmentSheetVisible(false);
-  }, []);
+  }, [isRecordingAudio]);
+
+  const toggleAudioRecording = useCallback(async () => {
+    if (isRecordingAudio) {
+      await stopAudioRecording();
+      closeAttachmentMenu();
+      return;
+    }
+    await startAudioRecording();
+  }, [closeAttachmentMenu, isRecordingAudio, startAudioRecording, stopAudioRecording]);
 
   const openAttachmentFile = useCallback(async (url: string) => {
     try {
@@ -537,6 +610,15 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
       listRef.current?.scrollToEnd({ animated: true })
     );
   }, [isUserTyping, messages.length]);
+
+  useEffect(() => {
+    return () => {
+      if (isRecordingAudio) {
+        audioRecorderRef.current.stopRecorder().catch(() => undefined);
+      }
+      audioRecorderRef.current.removeRecordBackListener();
+    };
+  }, [isRecordingAudio]);
 
   useEffect(() => {
     if (hasShownDisconnectAlertRef.current) {
@@ -776,6 +858,13 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             <Text style={styles.typingText}>{customerName} is typing...</Text>
           </View>
         ) : null}
+        {isRecordingAudio ? (
+          <View style={styles.recordingContainer}>
+            <Text style={styles.recordingText}>
+              Recording audio... {formatSessionClock(recordingSec)}
+            </Text>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -873,14 +962,21 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               <Pressable
                 style={styles.attachmentOption}
                 onPress={() => {
-                  closeAttachmentMenu();
-                  pickAudioForRecorder();
+                  toggleAudioRecording();
                 }}
               >
-                <View style={[styles.attachmentCircle, styles.recorderCircle]}>
+                <View
+                  style={[
+                    styles.attachmentCircle,
+                    styles.recorderCircle,
+                    isRecordingAudio && styles.recorderCircleActive,
+                  ]}
+                >
                   <Text style={styles.attachmentIcon}>🎙️</Text>
                 </View>
-                <Text style={styles.attachmentLabel}>Recorder</Text>
+                <Text style={styles.attachmentLabel}>
+                  {isRecordingAudio ? "Stop & Send" : "Recorder"}
+                </Text>
               </Pressable>
 
               <Pressable
@@ -995,6 +1091,15 @@ const styles = StyleSheet.create({
     fontSize: normalizeFont(12),
     color: "#6B5E5E",
     fontStyle: "italic",
+  },
+  recordingContainer: {
+    paddingHorizontal: wp(6),
+    paddingBottom: 6,
+  },
+  recordingText: {
+    fontSize: normalizeFont(12),
+    color: "#B42323",
+    fontWeight: "600",
   },
   bubbleRow: {
     marginBottom: 12,
@@ -1235,6 +1340,9 @@ const styles = StyleSheet.create({
   },
   recorderCircle: {
     backgroundColor: "#2D2D35",
+  },
+  recorderCircleActive: {
+    backgroundColor: "#B42323",
   },
   galleryCircle: {
     backgroundColor: "#CEE0F6",
