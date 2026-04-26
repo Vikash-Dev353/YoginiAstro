@@ -28,7 +28,7 @@ export type OrderStackParamList = {
   AttachmentViewer: {
     uri: string;
     name?: string;
-    type: 'image' | 'pdf';
+    type: 'image' | 'pdf' | 'video' | 'audio';
   };
 };
 

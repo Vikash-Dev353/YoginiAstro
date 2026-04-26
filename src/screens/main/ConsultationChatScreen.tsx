@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Linking,
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   StyleSheet,
@@ -356,12 +357,40 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const pickFromCamera = useCallback(
     async (mode: "photo" | "video") => {
       try {
+        if (Platform.OS === "android") {
+          const requiredPermissions =
+            mode === "video"
+              ? [
+                  PermissionsAndroid.PERMISSIONS.CAMERA,
+                  PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+                ]
+              : [PermissionsAndroid.PERMISSIONS.CAMERA];
+
+          const permissionResult = await PermissionsAndroid.requestMultiple(
+            requiredPermissions
+          );
+          const allGranted = requiredPermissions.every(
+            (permission) =>
+              permissionResult[permission] === PermissionsAndroid.RESULTS.GRANTED
+          );
+
+          if (!allGranted) {
+            Alert.alert(
+              "Permission Required",
+              mode === "video"
+                ? "Camera and microphone permissions are required to record video."
+                : "Camera permission is required to capture photo."
+            );
+            return;
+          }
+        }
+
         const result = await launchCamera({
           mediaType: mode,
           cameraType: "back",
           quality: 0.8,
           videoQuality: "medium",
-          durationLimit: mode === "video" ? 180 : undefined,
+          ...(mode === "video" ? { durationLimit: 180 } : {}),
           includeBase64: false,
         });
         if (result.didCancel) return;
@@ -458,7 +487,12 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         fileUrl: item.fileUrl,
         fileName: item.fileName || item.text,
       });
-      if (kind === "image" || kind === "pdf") {
+      if (
+        kind === "image" ||
+        kind === "pdf" ||
+        kind === "video" ||
+        kind === "audio"
+      ) {
         navigation.navigate("AttachmentViewer", {
           uri: item.fileUrl,
           name: item.fileName || item.text,

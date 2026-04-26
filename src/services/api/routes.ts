@@ -24,6 +24,6 @@ export const API_ROUTES = {
     generateKundali: '/astrology/generate-kundali',
   },
   file: {
-    uploadFile: '/file/upload-file',
+    uploadFile: '/chat/upload-media',
   },
 } as const;
