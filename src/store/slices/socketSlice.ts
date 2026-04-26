@@ -125,8 +125,10 @@ const socketSlice = createSlice({
     setAstroChatData: (state, action: PayloadAction<Record<string, unknown> | null>) => {
       state.astroChatData = action.payload;
     },
-    setChatRequests: (state, action: PayloadAction<ChatRequestItem[]>) => {
-      state.chatRequests = action.payload || [];
+    setChatRequests: (state, action: PayloadAction<ChatRequestItem[] | unknown>) => {
+      state.chatRequests = Array.isArray(action.payload)
+        ? (action.payload as ChatRequestItem[])
+        : [];
     },
     setChatDisconnect: (state, action: PayloadAction<boolean>) => {
       state.chatDisconnect = action.payload;
@@ -135,7 +137,10 @@ const socketSlice = createSlice({
       state.timerStart = action.payload;
     },
     removeChatRequest: (state, action: PayloadAction<string>) => {
-      state.chatRequests = state.chatRequests.filter(
+      const chatRequests = Array.isArray(state.chatRequests)
+        ? state.chatRequests
+        : [];
+      state.chatRequests = chatRequests.filter(
         (r) => r.roomId !== action.payload
       );
     },

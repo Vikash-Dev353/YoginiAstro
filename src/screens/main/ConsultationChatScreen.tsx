@@ -67,6 +67,7 @@ type ChatMessage = {
   isMine: boolean;
   createdAt: number;
   isFile?: boolean;
+  fileName?: string;
   fileUrl?: string;
   fileType?: string;
 };
@@ -137,6 +138,32 @@ function mapAssetToAttachment(asset?: Asset): AttachmentCandidate | null {
     type: asset.type || inferMimeFromName(name),
     size: asset.fileSize,
   };
+}
+
+function getAttachmentKind(params: {
+  fileType?: string;
+  fileUrl?: string;
+  fileName?: string;
+}): "image" | "pdf" | "other" {
+  const fileType = params.fileType?.toLowerCase() || "";
+  const fileUrl = params.fileUrl?.toLowerCase() || "";
+  const fileName = params.fileName?.toLowerCase() || "";
+  if (fileType.startsWith("image/")) return "image";
+  if (fileType.includes("pdf")) return "pdf";
+  if (fileUrl.endsWith(".pdf") || fileName.endsWith(".pdf")) return "pdf";
+  if (
+    fileUrl.endsWith(".jpg") ||
+    fileUrl.endsWith(".jpeg") ||
+    fileUrl.endsWith(".png") ||
+    fileUrl.endsWith(".webp") ||
+    fileName.endsWith(".jpg") ||
+    fileName.endsWith(".jpeg") ||
+    fileName.endsWith(".png") ||
+    fileName.endsWith(".webp")
+  ) {
+    return "image";
+  }
+  return "other";
 }
 
 function ConsultationChatScreenComponent({ navigation, route }: Props) {
@@ -401,6 +428,27 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     }
   }, []);
 
+  const openAttachmentPreview = useCallback(
+    (item: ChatMessage) => {
+      if (!item.fileUrl) return;
+      const kind = getAttachmentKind({
+        fileType: item.fileType,
+        fileUrl: item.fileUrl,
+        fileName: item.fileName || item.text,
+      });
+      if (kind === "image" || kind === "pdf") {
+        navigation.navigate("AttachmentViewer", {
+          uri: item.fileUrl,
+          name: item.fileName || item.text,
+          type: kind,
+        });
+        return;
+      }
+      openAttachmentFile(item.fileUrl);
+    },
+    [navigation, openAttachmentFile]
+  );
+
   const messages = useMemo<ChatMessage[]>(() => {
     return socketMessages.map((msg, index) => {
       const ts = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
@@ -410,6 +458,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         isMine: msg.sender === "astrologer",
         createdAt: Number.isNaN(ts) ? Date.now() : ts,
         isFile: Boolean(msg.isFile),
+        fileName: msg.fileName,
         fileUrl: msg.fileUrl,
         fileType: msg.fileType,
       };
@@ -510,12 +559,34 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             ]}
           >
             {item.isFile && item.fileUrl ? (
-              <Pressable onPress={() => openAttachmentFile(item.fileUrl || "")}>
-                <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                  {item.text || "Attachment"}
-                </Text>
+              <Pressable onPress={() => openAttachmentPreview(item)}>
+                {getAttachmentKind({
+                  fileType: item.fileType,
+                  fileUrl: item.fileUrl,
+                  fileName: item.fileName || item.text,
+                }) === "image" ? (
+                  <View>
+                    <Image
+                      source={{ uri: item.fileUrl }}
+                      style={styles.attachmentPreviewImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                      {item.fileName || item.text || "Image"}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.pdfPreviewBox, mine && styles.pdfPreviewBoxMine]}>
+                    <Text style={[styles.pdfPreviewIcon, mine && styles.pdfPreviewIconMine]}>
+                      PDF
+                    </Text>
+                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                      {item.fileName || item.text || "Document"}
+                    </Text>
+                  </View>
+                )}
                 <Text style={[styles.fileHintText, mine && styles.fileHintTextMine]}>
-                  Tap to open
+                  Tap to preview
                 </Text>
               </Pressable>
             ) : (
@@ -548,7 +619,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         </View>
       );
     },
-    [astrologerAvatarSource, avatarSource, openAttachmentFile]
+    [astrologerAvatarSource, avatarSource, openAttachmentPreview]
   );
 
   return (
@@ -882,6 +953,35 @@ const styles = StyleSheet.create({
   },
   fileHintTextMine: {
     color: "rgba(255,255,255,0.85)",
+  },
+  attachmentPreviewImage: {
+    width: Math.min(wp(52), 220),
+    height: 130,
+    borderRadius: 10,
+    marginBottom: 8,
+    backgroundColor: "#E7E1DA",
+  },
+  pdfPreviewBox: {
+    borderWidth: 1,
+    borderColor: "#D6CBC1",
+    backgroundColor: "#FFF4EE",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  pdfPreviewBoxMine: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  pdfPreviewIcon: {
+    fontSize: normalizeFont(11),
+    fontWeight: "700",
+    color: "#A5332B",
+    marginBottom: 4,
+  },
+  pdfPreviewIconMine: {
+    color: "#FFFFFF",
   },
   bubbleMeta: {
     flexDirection: "row",

@@ -25,6 +25,11 @@ export type OrderStackParamList = {
     kundaliPayload?: GenerateKundaliPayload;
     customerImage?: string | null;
   };
+  AttachmentViewer: {
+    uri: string;
+    name?: string;
+    type: 'image' | 'pdf';
+  };
 };
 
 export type ProfileStackParamList = {
