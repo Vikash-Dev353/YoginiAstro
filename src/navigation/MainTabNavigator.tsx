@@ -61,10 +61,11 @@ const CustomTabBar = memo(
       });
     }, [navigation, nestedRouteName, socketChatRequests]);
 
-    /** Hide tabs on live chat so the composer sits at the bottom instead of the tab bar. */
+    /** Hide tabs on live chat / incoming request so bottom actions stay visible. */
     if (
       currentTabRoute.name === 'Order' &&
-      nestedRouteName === 'ConsultationChat'
+      (nestedRouteName === 'ConsultationChat' ||
+        nestedRouteName === 'IncomingChatRequest')
     ) {
       return null;
     }

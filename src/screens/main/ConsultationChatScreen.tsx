@@ -29,6 +29,7 @@ import {
   type Asset,
 } from "react-native-image-picker";
 import AudioRecorderPlayer from "react-native-audio-recorder-player";
+import Video from "react-native-video";
 import {
   errorCodes as documentPickerErrorCodes,
   isErrorWithCode as isDocumentPickerError,
@@ -37,6 +38,7 @@ import {
 } from "@react-native-documents/picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
+import { sounds } from "../../assets/sounds";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { OrderStackParamList } from "../../navigation/types";
@@ -208,9 +210,12 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const [astrologerImageUri, setAstrologerImageUri] = useState<string | null>(null);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingSec, setRecordingSec] = useState(0);
+  const [playSendSound, setPlaySendSound] = useState(false);
+  const [playReceiveSound, setPlayReceiveSound] = useState(false);
   const hasShownDisconnectAlertRef = useRef(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const audioRecorderRef = useRef(new AudioRecorderPlayer());
+  const previousMessageCountRef = useRef(0);
 
   const initialRemainingSec = useMemo(() => {
     const chatData = socketState.astroChatData as
@@ -278,6 +283,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const onSend = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+    setPlaySendSound(false);
+    setTimeout(() => setPlaySendSound(true), 0);
     setDraft("");
     dispatch(
       sendMessage({
@@ -336,6 +343,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         }
 
         const majorFileType = `${attachment.type.split("/")[0] || "application"}/`;
+        setPlaySendSound(false);
+        setTimeout(() => setPlaySendSound(true), 0);
         dispatch(
           sendMessage({
             sender: "astrologer",
@@ -612,6 +621,25 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   }, [isUserTyping, messages.length]);
 
   useEffect(() => {
+    previousMessageCountRef.current = socketMessages.length;
+  }, [roomId, socketMessages.length]);
+
+  useEffect(() => {
+    const previousCount = previousMessageCountRef.current;
+    const currentCount = socketMessages.length;
+    if (currentCount <= previousCount) {
+      previousMessageCountRef.current = currentCount;
+      return;
+    }
+    const latest = socketMessages[currentCount - 1];
+    if (latest?.sender !== "astrologer") {
+      setPlayReceiveSound(false);
+      setTimeout(() => setPlayReceiveSound(true), 0);
+    }
+    previousMessageCountRef.current = currentCount;
+  }, [socketMessages]);
+
+  useEffect(() => {
     return () => {
       if (isRecordingAudio) {
         audioRecorderRef.current.stopRecorder().catch(() => undefined);
@@ -801,6 +829,26 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
+      <Video
+        source={sounds.messageSend}
+        style={styles.hiddenAudioPlayer}
+        paused={!playSendSound}
+        onEnd={() => setPlaySendSound(false)}
+        onError={() => setPlaySendSound(false)}
+        playWhenInactive
+        ignoreSilentSwitch="ignore"
+        volume={1.0}
+      />
+      <Video
+        source={sounds.messageReceive}
+        style={styles.hiddenAudioPlayer}
+        paused={!playReceiveSound}
+        onEnd={() => setPlayReceiveSound(false)}
+        onError={() => setPlayReceiveSound(false)}
+        playWhenInactive
+        ignoreSilentSwitch="ignore"
+        volume={1.0}
+      />
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerLeft}>
           <Image
@@ -1008,6 +1056,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: CHAT_BG,
+  },
+  hiddenAudioPlayer: {
+    width: 0,
+    height: 0,
   },
   flex: {
     flex: 1,

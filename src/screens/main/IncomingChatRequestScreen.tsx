@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Video from "react-native-video";
 import { images } from "../../assets/images";
+import { sounds } from "../../assets/sounds";
 import { OrderStackParamList } from "../../navigation/types";
 import { useAppDispatch } from "../../store/hooks";
 import {
@@ -15,7 +16,6 @@ import {
 import { normalizeFont, wp } from "../../utils/responsive";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "IncomingChatRequest">;
-const INCOMING_RINGTONE_URL = "https://www.soundjay.com/phones/phone-ring-1.mp3";
 
 export function IncomingChatRequestScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
@@ -84,13 +84,18 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
   return (
     <ImageBackground source={images.appBackground} style={styles.root} resizeMode="cover">
       <Video
-        source={{ uri: INCOMING_RINGTONE_URL }}
+        source={sounds.waitlist}
         style={styles.hiddenRingtone}
         paused={!isAlerting}
         repeat
-        audioOnly
+        muted={false}
+        volume={1.0}
+        playWhenInactive
         playInBackground={false}
         ignoreSilentSwitch="ignore"
+        onError={(error) => {
+          console.log("incoming ringtone error", error);
+        }}
       />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centerWrap}>

@@ -224,6 +224,32 @@ function normalizeHistoryPayload(payload: unknown): SocketMessage[] {
   return [];
 }
 
+function normalizeChatRequestsPayload(payload: unknown): ChatRequestItem[] {
+  if (Array.isArray(payload)) {
+    return payload as ChatRequestItem[];
+  }
+  if (payload && typeof payload === "object") {
+    const direct = payload as { waitingList?: unknown; requests?: unknown };
+    if (Array.isArray(direct.waitingList)) {
+      return direct.waitingList as ChatRequestItem[];
+    }
+    if (Array.isArray(direct.requests)) {
+      return direct.requests as ChatRequestItem[];
+    }
+
+    const nested = payload as {
+      data?: { waitingList?: unknown; requests?: unknown };
+    };
+    if (Array.isArray(nested.data?.waitingList)) {
+      return nested.data.waitingList as ChatRequestItem[];
+    }
+    if (Array.isArray(nested.data?.requests)) {
+      return nested.data.requests as ChatRequestItem[];
+    }
+  }
+  return [];
+}
+
 export const syncSocketSession =
   (params: {
     authToken: string | null;
@@ -306,8 +332,20 @@ export const syncSocketSession =
       dispatch(setChatHistory(normalizeHistoryPayload(history)));
     });
 
-    socket.on("chat-requests", (requests: ChatRequestItem[]) => {
-      dispatch(setChatRequests(requests || []));
+    socket.on("chat-requests", (requests: unknown) => {
+      const normalizedRequests = normalizeChatRequestsPayload(requests);
+      dispatch(setChatRequests(normalizedRequests));
+
+      if (requests && typeof requests === "object") {
+        const raw = requests as {
+          waitingCount?: number;
+          data?: { waitingCount?: number };
+        };
+        const waitingCount = raw.waitingCount ?? raw.data?.waitingCount;
+        if (typeof waitingCount === "number") {
+          dispatch(setWaitlistCount(waitingCount));
+        }
+      }
     });
 
     socket.on("chat-rejected", ({ roomId }: { roomId?: string }) => {
