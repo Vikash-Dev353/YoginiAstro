@@ -144,12 +144,34 @@ function getAttachmentKind(params: {
   fileType?: string;
   fileUrl?: string;
   fileName?: string;
-}): "image" | "pdf" | "other" {
+}): "image" | "pdf" | "video" | "audio" | "other" {
   const fileType = params.fileType?.toLowerCase() || "";
   const fileUrl = params.fileUrl?.toLowerCase() || "";
   const fileName = params.fileName?.toLowerCase() || "";
   if (fileType.startsWith("image/")) return "image";
+  if (fileType.startsWith("video/")) return "video";
+  if (fileType.startsWith("audio/")) return "audio";
   if (fileType.includes("pdf")) return "pdf";
+  if (
+    fileUrl.endsWith(".mp4") ||
+    fileUrl.endsWith(".mov") ||
+    fileUrl.endsWith(".mkv") ||
+    fileName.endsWith(".mp4") ||
+    fileName.endsWith(".mov") ||
+    fileName.endsWith(".mkv")
+  ) {
+    return "video";
+  }
+  if (
+    fileUrl.endsWith(".mp3") ||
+    fileUrl.endsWith(".wav") ||
+    fileUrl.endsWith(".m4a") ||
+    fileName.endsWith(".mp3") ||
+    fileName.endsWith(".wav") ||
+    fileName.endsWith(".m4a")
+  ) {
+    return "audio";
+  }
   if (fileUrl.endsWith(".pdf") || fileName.endsWith(".pdf")) return "pdf";
   if (
     fileUrl.endsWith(".jpg") ||
@@ -560,31 +582,70 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
           >
             {item.isFile && item.fileUrl ? (
               <Pressable onPress={() => openAttachmentPreview(item)}>
-                {getAttachmentKind({
-                  fileType: item.fileType,
-                  fileUrl: item.fileUrl,
-                  fileName: item.fileName || item.text,
-                }) === "image" ? (
-                  <View>
-                    <Image
-                      source={{ uri: item.fileUrl }}
-                      style={styles.attachmentPreviewImage}
-                      resizeMode="cover"
-                    />
-                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                      {item.fileName || item.text || "Image"}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.pdfPreviewBox, mine && styles.pdfPreviewBoxMine]}>
-                    <Text style={[styles.pdfPreviewIcon, mine && styles.pdfPreviewIconMine]}>
-                      PDF
-                    </Text>
-                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                      {item.fileName || item.text || "Document"}
-                    </Text>
-                  </View>
-                )}
+                {(() => {
+                  const attachmentKind = getAttachmentKind({
+                    fileType: item.fileType,
+                    fileUrl: item.fileUrl,
+                    fileName: item.fileName || item.text,
+                  });
+                  if (attachmentKind === "image") {
+                    return (
+                      <View>
+                        <Image
+                          source={{ uri: item.fileUrl }}
+                          style={styles.attachmentPreviewImage}
+                          resizeMode="cover"
+                        />
+                        <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                          {item.fileName || item.text || "Image"}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  if (attachmentKind === "video") {
+                    return (
+                      <View style={[styles.mediaPreviewBox, mine && styles.mediaPreviewBoxMine]}>
+                        <Text style={[styles.mediaPreviewIcon, mine && styles.mediaPreviewIconMine]}>
+                          🎬
+                        </Text>
+                        <Text style={[styles.mediaPreviewLabel, mine && styles.mediaPreviewLabelMine]}>
+                          Video
+                        </Text>
+                        <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                          {item.fileName || item.text || "Video file"}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  if (attachmentKind === "audio") {
+                    return (
+                      <View style={[styles.mediaPreviewBox, mine && styles.mediaPreviewBoxMine]}>
+                        <Text style={[styles.mediaPreviewIcon, mine && styles.mediaPreviewIconMine]}>
+                          🎵
+                        </Text>
+                        <Text style={[styles.mediaPreviewLabel, mine && styles.mediaPreviewLabelMine]}>
+                          Audio
+                        </Text>
+                        <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                          {item.fileName || item.text || "Audio file"}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return (
+                    <View style={[styles.pdfPreviewBox, mine && styles.pdfPreviewBoxMine]}>
+                      <Text style={[styles.pdfPreviewIcon, mine && styles.pdfPreviewIconMine]}>
+                        📄
+                      </Text>
+                      <Text style={[styles.pdfPreviewLabel, mine && styles.pdfPreviewLabelMine]}>
+                        PDF
+                      </Text>
+                      <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                        {item.fileName || item.text || "Document"}
+                      </Text>
+                    </View>
+                  );
+                })()}
                 <Text style={[styles.fileHintText, mine && styles.fileHintTextMine]}>
                   Tap to preview
                 </Text>
@@ -975,12 +1036,48 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.4)",
   },
   pdfPreviewIcon: {
+    fontSize: normalizeFont(18),
+    marginBottom: 4,
+  },
+  pdfPreviewLabel: {
     fontSize: normalizeFont(11),
     fontWeight: "700",
     color: "#A5332B",
     marginBottom: 4,
   },
   pdfPreviewIconMine: {
+    color: "#FFFFFF",
+  },
+  pdfPreviewLabelMine: {
+    color: "#FFFFFF",
+  },
+  mediaPreviewBox: {
+    borderWidth: 1,
+    borderColor: "#D6CBC1",
+    backgroundColor: "#F6F0EA",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  mediaPreviewBoxMine: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  mediaPreviewIcon: {
+    fontSize: normalizeFont(18),
+    marginBottom: 4,
+  },
+  mediaPreviewIconMine: {
+    color: "#FFFFFF",
+  },
+  mediaPreviewLabel: {
+    fontSize: normalizeFont(11),
+    fontWeight: "700",
+    color: "#5C3D2E",
+    marginBottom: 4,
+  },
+  mediaPreviewLabelMine: {
     color: "#FFFFFF",
   },
   bubbleMeta: {
