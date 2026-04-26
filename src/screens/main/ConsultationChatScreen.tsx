@@ -361,11 +361,22 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     });
   }, [socketMessages, roomId]);
 
+  const isUserTyping = useMemo(() => {
+    if (!socketState.isTyping) return false;
+    const typingPayload = socketState.typingUser as
+      | { roomId?: string; sender?: string }
+      | null;
+    if (!typingPayload) return false;
+    const sameRoom = !typingPayload.roomId || typingPayload.roomId === roomId;
+    const fromUser = !typingPayload.sender || typingPayload.sender !== "astrologer";
+    return sameRoom && fromUser;
+  }, [roomId, socketState.isTyping, socketState.typingUser]);
+
   useEffect(() => {
     requestAnimationFrame(() =>
       listRef.current?.scrollToEnd({ animated: true })
     );
-  }, [messages.length, socketState.isTyping]);
+  }, [isUserTyping, messages.length]);
 
   useEffect(() => {
     if (socketState.chatDisconnect) {
@@ -485,6 +496,11 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
           style={styles.list}
           showsVerticalScrollIndicator={false}
         />
+        {isUserTyping ? (
+          <View style={styles.typingContainer}>
+            <Text style={styles.typingText}>{customerName} is typing...</Text>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -694,6 +710,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  typingContainer: {
+    paddingHorizontal: wp(6),
+    paddingTop: 2,
+    paddingBottom: 8,
+  },
+  typingText: {
+    fontSize: normalizeFont(12),
+    color: "#6B5E5E",
+    fontStyle: "italic",
   },
   bubbleRow: {
     marginBottom: 12,
