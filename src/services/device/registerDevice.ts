@@ -17,10 +17,10 @@ const DEVICE_ID_KEY = "@yogini_device_install_id";
  * Same URL as curl — meanmaestro device API only (not the main REST `apiClient` base).
  */
 export const REGISTER_DEVICE_URL =
-  "https://meanmaestro.space/api/device/register-device";
+  "https://yoginiastro.com/api/device/register-device";
 
 export const ATTACH_DEVICE_URL =
-  "https://meanmaestro.space/api/device/attach-device";
+  "https://yoginiastro.com/api/device/attach-device";
 
 function randomUuidV4(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {

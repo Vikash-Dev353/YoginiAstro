@@ -77,13 +77,13 @@ export function logSocketConnectionRequest(params: {
  *
  * @see https://socket.io/docs/v4/client-options/#path
  */
-export const SOCKET_SERVER_URL = "https://meanmaestro.space";
+export const SOCKET_SERVER_URL = "https://yoginiastro.com/";
 
 /**
  * Engine.IO path on the **origin** host (default is `/socket.io`).
  * Must match where the server mounts Socket.IO — not the same as namespace.
  */
-export const SOCKET_IO_PATH = "/chat/socket.io";
+export const SOCKET_IO_PATH = "/dev/chat/socket.io";
 export const SOCKET_IO_FALLBACK_PATH = "/dev/chat/socket.io";
 
 /** @deprecated Use {@link SOCKET_SERVER_URL} — old name mixed up namespace vs engine path. */

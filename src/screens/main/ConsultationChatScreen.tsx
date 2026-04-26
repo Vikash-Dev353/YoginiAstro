@@ -8,9 +8,13 @@ import {
   useState,
 } from "react";
 import {
+  Alert,
+  ActivityIndicator,
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -18,6 +22,17 @@ import {
   TextInput,
   View,
 } from "react-native";
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+} from "react-native-image-picker";
+import {
+  errorCodes as documentPickerErrorCodes,
+  isErrorWithCode as isDocumentPickerError,
+  pick as pickDocumentFile,
+  types as documentTypes,
+} from "@react-native-documents/picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
 import { colors } from "../../constants/colors";
@@ -49,6 +64,7 @@ type ChatMessage = {
   createdAt: number;
   isFile?: boolean;
   fileUrl?: string;
+  fileType?: string;
 };
 
 const HEADER = "#632B27";
@@ -56,6 +72,16 @@ const CHAT_BG = "#FCF9F5";
 const SENT_BUBBLE = "#632B27";
 const RECEIVED_BG = "#FFF9F5";
 const RECEIVED_BORDER = "#E5DDD5";
+const MAX_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024;
+const ATTACHMENT_ERROR_TITLE = "Attachment Error";
+const ATTACHMENT_PICKER_ERROR_TITLE = "Picker Error";
+
+type AttachmentCandidate = {
+  uri: string;
+  name: string;
+  type: string;
+  size?: number;
+};
 
 function formatBubbleTime(ts: number): string {
   return new Date(ts).toLocaleTimeString("en-US", {
@@ -71,6 +97,44 @@ function formatSessionClock(totalSeconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+function inferNameFromUri(uri: string): string {
+  const chunks = uri.split("/");
+  const last = chunks[chunks.length - 1] || "attachment";
+  return decodeURIComponent(last);
+}
+
+function inferMimeFromName(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".mkv")) {
+    return "video/mp4";
+  }
+  if (lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav")) {
+    return "audio/mpeg";
+  }
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  return "application/octet-stream";
+}
+
+function mapAssetToAttachment(asset?: Asset): AttachmentCandidate | null {
+  if (!asset?.uri) return null;
+  const name = asset.fileName || inferNameFromUri(asset.uri);
+  return {
+    uri: asset.uri,
+    name,
+    type: asset.type || inferMimeFromName(name),
+    size: asset.fileSize,
+  };
+}
+
 function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const { customerName, roomId, senderId, kundaliPayload, customerImage } =
     route.params;
@@ -82,6 +146,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
 
   const [elapsedSec, setElapsedSec] = useState(0);
   const [draft, setDraft] = useState("");
+  const [isSendingAttachment, setIsSendingAttachment] = useState(false);
+  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -143,6 +209,143 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     );
   }, [dispatch, draft, roomId]);
 
+  const sendAttachment = useCallback(
+    async (attachment: AttachmentCandidate | null) => {
+      if (!attachment?.uri) {
+        return;
+      }
+
+      if (
+        typeof attachment.size === "number" &&
+        attachment.size > MAX_ATTACHMENT_SIZE_BYTES
+      ) {
+        Alert.alert(
+          ATTACHMENT_ERROR_TITLE,
+          `Maximum file size is 20 MB. Selected file is ${formatSize(
+            attachment.size
+          )}.`
+        );
+        return;
+      }
+
+      setIsSendingAttachment(true);
+      try {
+        dispatch(
+          sendMessage({
+            sender: "astrologer",
+            roomId,
+            message: attachment.name,
+            timestamp: new Date().toISOString(),
+            isFile: true,
+            fileUrl: attachment.uri,
+            fileName: attachment.name,
+            fileType: attachment.type,
+          })
+        );
+      } finally {
+        setIsSendingAttachment(false);
+      }
+    },
+    [dispatch, roomId]
+  );
+
+  const pickFromCamera = useCallback(
+    async (mode: "photo" | "video") => {
+      try {
+        const result = await launchCamera({
+          mediaType: mode,
+          cameraType: "back",
+          quality: 0.8,
+          videoQuality: "medium",
+          durationLimit: mode === "video" ? 180 : undefined,
+          includeBase64: false,
+        });
+        if (result.didCancel) return;
+        if (result.errorMessage) {
+          Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, result.errorMessage);
+          return;
+        }
+        await sendAttachment(mapAssetToAttachment(result.assets?.[0]));
+      } catch {
+        Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to open camera.");
+      }
+    },
+    [sendAttachment]
+  );
+
+  const pickAudioForRecorder = useCallback(
+    async () => {
+      try {
+        const [picked] = await pickDocumentFile({
+          type: [documentTypes.audio],
+          presentationStyle: "fullScreen",
+        });
+        if (!picked) {
+          return;
+        }
+        await sendAttachment({
+          uri: picked.uri,
+          name: picked.name || inferNameFromUri(picked.uri || ""),
+          type: picked.type || inferMimeFromName(picked.name || ""),
+          size: picked.size ?? undefined,
+        });
+      } catch (error) {
+        if (
+          !(
+            isDocumentPickerError(error) &&
+            error.code === documentPickerErrorCodes.OPERATION_CANCELED
+          )
+        ) {
+          Alert.alert(
+            ATTACHMENT_PICKER_ERROR_TITLE,
+            "Unable to pick this attachment."
+          );
+        }
+      }
+    },
+    [sendAttachment]
+  );
+
+  const pickFromGallery = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: "mixed" as "photo",
+        quality: 0.8,
+        selectionLimit: 1,
+        includeBase64: false,
+      });
+      if (result.didCancel) return;
+      if (result.errorMessage) {
+        Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, result.errorMessage);
+        return;
+      }
+      await sendAttachment(mapAssetToAttachment(result.assets?.[0]));
+    } catch {
+      Alert.alert(ATTACHMENT_PICKER_ERROR_TITLE, "Unable to open gallery.");
+    }
+  }, [sendAttachment]);
+
+  const onOpenAttachmentMenu = useCallback(() => {
+    setIsAttachmentSheetVisible(true);
+  }, []);
+
+  const closeAttachmentMenu = useCallback(() => {
+    setIsAttachmentSheetVisible(false);
+  }, []);
+
+  const openAttachmentFile = useCallback(async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Open File", "Unable to open this attachment.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert("Open File", "Unable to open this attachment.");
+    }
+  }, []);
+
   const messages = useMemo<ChatMessage[]>(() => {
     return socketMessages.map((msg, index) => {
       const ts = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
@@ -153,6 +356,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         createdAt: Number.isNaN(ts) ? Date.now() : ts,
         isFile: Boolean(msg.isFile),
         fileUrl: msg.fileUrl,
+        fileType: msg.fileType,
       };
     });
   }, [socketMessages, roomId]);
@@ -186,9 +390,14 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             ]}
           >
             {item.isFile && item.fileUrl ? (
-              <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                {item.text || item.fileUrl}
-              </Text>
+              <Pressable onPress={() => openAttachmentFile(item.fileUrl || "")}>
+                <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                  {item.text || "Attachment"}
+                </Text>
+                <Text style={[styles.fileHintText, mine && styles.fileHintTextMine]}>
+                  Tap to open
+                </Text>
+              </Pressable>
             ) : (
               <Text
                 style={[styles.bubbleText, mine && styles.bubbleTextMine]}
@@ -212,7 +421,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         </View>
       );
     },
-    []
+    [openAttachmentFile]
   );
 
   const avatarSource = useMemo(() => {
@@ -305,11 +514,16 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             <Pressable
               style={styles.attachInner}
               hitSlop={8}
-              onPress={() => {}}
+              onPress={onOpenAttachmentMenu}
+              disabled={isSendingAttachment}
               accessibilityRole="button"
               accessibilityLabel="Attach"
             >
-              <Text style={styles.attachIcon}>📎</Text>
+              {isSendingAttachment ? (
+                <ActivityIndicator size="small" color="#5C3D2E" />
+              ) : (
+                <Text style={styles.attachIcon}>📎</Text>
+              )}
             </Pressable>
           </View>
           <Pressable
@@ -325,6 +539,78 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={isAttachmentSheetVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeAttachmentMenu}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={closeAttachmentMenu}>
+          <Pressable
+            style={styles.sheetContainer}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={styles.sheetHandle} />
+            <View style={styles.attachmentRow}>
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={() => {
+                  closeAttachmentMenu();
+                  pickFromCamera("photo");
+                }}
+              >
+                <View style={styles.attachmentCircle}>
+                  <Text style={styles.attachmentIcon}>📷</Text>
+                </View>
+                <Text style={styles.attachmentLabel}>Camera</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={() => {
+                  closeAttachmentMenu();
+                  pickFromCamera("video");
+                }}
+              >
+                <View style={styles.attachmentCircle}>
+                  <Text style={styles.attachmentIcon}>🎥</Text>
+                </View>
+                <Text style={styles.attachmentLabel}>Camera{"\n"}Camcorder</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={() => {
+                  closeAttachmentMenu();
+                  pickAudioForRecorder();
+                }}
+              >
+                <View style={[styles.attachmentCircle, styles.recorderCircle]}>
+                  <Text style={styles.attachmentIcon}>🎙️</Text>
+                </View>
+                <Text style={styles.attachmentLabel}>Recorder</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={() => {
+                  closeAttachmentMenu();
+                  pickFromGallery();
+                }}
+              >
+                <View style={[styles.attachmentCircle, styles.galleryCircle]}>
+                  <Text style={styles.attachmentIcon}>🖼️</Text>
+                </View>
+                <Text style={styles.attachmentLabel}>Photos &{"\n"}videos</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.sheetCancel} onPress={closeAttachmentMenu}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -444,6 +730,15 @@ const styles = StyleSheet.create({
   bubbleTextMine: {
     color: "#FFFFFF",
   },
+  fileHintText: {
+    marginTop: 4,
+    fontSize: normalizeFont(11),
+    color: "#7D7070",
+    textDecorationLine: "underline",
+  },
+  fileHintTextMine: {
+    color: "rgba(255,255,255,0.85)",
+  },
   bubbleMeta: {
     flexDirection: "row",
     alignItems: "center",
@@ -521,5 +816,74 @@ const styles = StyleSheet.create({
   sendIcon: {
     color: "#FFFFFF",
     fontSize: normalizeFont(17),
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
+  sheetContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 64,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#D8D6D6",
+    marginBottom: 14,
+  },
+  attachmentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  attachmentOption: {
+    flex: 1,
+    alignItems: "center",
+  },
+  attachmentCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#F1F1F4",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  recorderCircle: {
+    backgroundColor: "#2D2D35",
+  },
+  galleryCircle: {
+    backgroundColor: "#CEE0F6",
+  },
+  attachmentIcon: {
+    fontSize: normalizeFont(24),
+  },
+  attachmentLabel: {
+    fontSize: normalizeFont(13),
+    lineHeight: normalizeFont(17),
+    textAlign: "center",
+    color: "#2F2A2A",
+    fontWeight: "500",
+  },
+  sheetCancel: {
+    marginTop: 14,
+    borderRadius: 10,
+    backgroundColor: "#F3ECE4",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  sheetCancelText: {
+    fontSize: normalizeFont(15),
+    fontWeight: "700",
+    color: "#5C3D2E",
   },
 });

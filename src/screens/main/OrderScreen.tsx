@@ -484,32 +484,33 @@ export function OrderScreen({ route, navigation }: Props) {
             <Pressable
               style={[styles.actionButton, styles.acceptButton]}
               onPress={() => {
+                console.log("waitlistItem==>>>>", waitlistItem);
                 if (waitlistItem.from && waitlistItem.id) {
                   dispatch(setSocketChatDisconnect(false));
                   dispatch(
                     setAstroChatData({
-                      from: waitlistItem.from,
-                      senderName: waitlistItem.name,
-                      userImage: waitlistItem.profileImage,
-                      roomId: waitlistItem.id,
-                      kundliUrl: waitlistItem.kundliUrl,
-                      userBalance: waitlistItem.userBalance,
-                      astroPrice: waitlistItem.astroPrice,
+                      from: waitlistItem?.from,
+                      senderName: waitlistItem?.name,
+                      userImage: waitlistItem?.profileImage,
+                      roomId: waitlistItem?.id,
+                      kundliUrl: waitlistItem?.kundliUrl,
+                      userBalance: waitlistItem?.userBalance,
+                      astroPrice: waitlistItem?.astroPrice,
                     })
                   );
                   dispatch(
                     acceptChat({
-                      from: waitlistItem.from,
-                      roomId: waitlistItem.id,
+                      from: waitlistItem?.from,
+                      roomId: waitlistItem?.id,
                     })
                   );
                 }
                 navigation.navigate("ConsultationChat", {
-                  customerName: waitlistItem.name,
-                  roomId: waitlistItem.id,
-                  senderId: waitlistItem.from,
-                  kundaliPayload: waitlistItem.generateKundaliPayload,
-                  customerImage: waitlistItem.profileImage,
+                  customerName: waitlistItem?.name,
+                  roomId: waitlistItem?.id,
+                  senderId: waitlistItem?.from,
+                  kundaliPayload: waitlistItem?.generateKundaliPayload,
+                  customerImage: waitlistItem?.profileImage,
                 });
               }}
             >
