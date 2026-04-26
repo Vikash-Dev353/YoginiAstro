@@ -3,11 +3,14 @@ import {
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { images } from '../assets/images';
 import { colors } from '../constants/colors';
 import { useTranslation } from '../localization/useTranslation';
+import { parseKundliUrlToPayload } from '../services/api/astroApi';
+import { selectChatRequests } from '../store/slices/socketSlice';
+import { useAppSelector } from '../store/hooks';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { NotificationScreen } from '../screens/main/NotificationScreen';
 import { OrderStackNavigator } from './OrderStackNavigator';
@@ -20,8 +23,44 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 const CustomTabBar = memo(
   ({ state, descriptors, navigation }: BottomTabBarProps) => {
     const { t } = useTranslation();
+    const socketChatRequests = useAppSelector(selectChatRequests);
+    const lastNotifiedRoomIdRef = useRef<string | null>(null);
     const currentTabRoute = state.routes[state.index];
     const nestedRouteName = getFocusedRouteNameFromRoute(currentTabRoute);
+
+    useEffect(() => {
+      const [firstRequest] = socketChatRequests;
+      if (!firstRequest?.roomId) {
+        lastNotifiedRoomIdRef.current = null;
+        return;
+      }
+      if (firstRequest.roomId === lastNotifiedRoomIdRef.current) {
+        return;
+      }
+      if (nestedRouteName === 'ConsultationChat') {
+        return;
+      }
+
+      lastNotifiedRoomIdRef.current = firstRequest.roomId;
+      navigation.navigate('Order', {
+        screen: 'IncomingChatRequest',
+        params: {
+          roomId: firstRequest.roomId,
+          from: firstRequest.senderId || firstRequest.from,
+          customerName:
+            firstRequest.userData?.fullName ||
+            firstRequest.senderName ||
+            'Unknown User',
+          customerImage: firstRequest.userData?.profileImage ?? firstRequest.senderImage,
+          message: firstRequest.message,
+          kundliUrl: firstRequest.kundliUrl,
+          kundaliPayload: parseKundliUrlToPayload(firstRequest.kundliUrl),
+          userBalance: firstRequest.balance?.balance,
+          astroPrice: firstRequest.astroData?.price,
+        },
+      });
+    }, [navigation, nestedRouteName, socketChatRequests]);
+
     /** Hide tabs on live chat so the composer sits at the bottom instead of the tab bar. */
     if (
       currentTabRoute.name === 'Order' &&

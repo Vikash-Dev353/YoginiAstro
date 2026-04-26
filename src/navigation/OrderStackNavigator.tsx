@@ -2,6 +2,7 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AttachmentViewerScreen } from '../screens/main/AttachmentViewerScreen';
 import { ConsultationChatScreen } from '../screens/main/ConsultationChatScreen';
+import { IncomingChatRequestScreen } from '../screens/main/IncomingChatRequestScreen';
 import { OrderScreen } from '../screens/main/OrderScreen';
 import { ViewKundliScreen } from '../screens/main/ViewKundliScreen';
 import { OrderStackParamList, RootTabParamList } from './types';
@@ -21,6 +22,7 @@ export function OrderStackNavigator(_props: Props) {
       screenOptions={{ headerShown: false, animation: 'none' }}
     >
       <Stack.Screen name="OrderList" component={OrderScreen} />
+      <Stack.Screen name="IncomingChatRequest" component={IncomingChatRequestScreen} />
       <Stack.Screen name="ViewKundli" component={ViewKundliScreen} />
       <Stack.Screen name="ConsultationChat" component={ConsultationChatScreen} />
       <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />
