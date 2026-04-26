@@ -261,6 +261,27 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
 
       setIsSendingAttachment(true);
       try {
+        const formData = new FormData();
+        formData.append("file", {
+          uri: attachment.uri,
+          name: attachment.name,
+          type: attachment.type,
+        } as unknown as Blob);
+
+        const uploadResponse = await astroApi.uploadChatFile(formData);
+        const uploadedFileUrl =
+          uploadResponse.fullUrl ||
+          uploadResponse.fileUrl ||
+          uploadResponse.url ||
+          uploadResponse.data?.fullUrl ||
+          uploadResponse.data?.fileUrl ||
+          uploadResponse.data?.url;
+
+        if (!uploadedFileUrl || uploadResponse.status !== "Success") {
+          throw new Error(uploadResponse.message || "Unable to upload attachment.");
+        }
+
+        const majorFileType = `${attachment.type.split("/")[0] || "application"}/`;
         dispatch(
           sendMessage({
             sender: "astrologer",
@@ -268,11 +289,14 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
             message: attachment.name,
             timestamp: new Date().toISOString(),
             isFile: true,
-            fileUrl: attachment.uri,
+            fileUrl: uploadedFileUrl,
             fileName: attachment.name,
-            fileType: attachment.type,
+            fileType: majorFileType,
+            file: uploadedFileUrl,
           })
         );
+      } catch {
+        Alert.alert(ATTACHMENT_ERROR_TITLE, "Unable to upload this attachment.");
       } finally {
         setIsSendingAttachment(false);
       }

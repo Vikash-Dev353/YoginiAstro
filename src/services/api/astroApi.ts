@@ -17,6 +17,19 @@ export type SetOnlinePayload = {
   callOnline: boolean;
 };
 
+export type UploadChatFileResponse = {
+  status?: string;
+  message?: string;
+  fullUrl?: string;
+  fileUrl?: string;
+  url?: string;
+  data?: {
+    fullUrl?: string;
+    fileUrl?: string;
+    url?: string;
+  };
+};
+
 /** Astrologer block from get-online / set-online (root or nested under `data`) */
 export type OnlineAstrologerInfo = {
   astroId?: string;
@@ -549,6 +562,16 @@ export const astroApi = {
   submitInitialProfile: (payload: FormData) =>
     apiService.post<UpdateProfileResponse>(
       'https://yoginiastro.com/api-v2/astrologer/initial-profile',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    ),
+  uploadChatFile: (payload: FormData) =>
+    apiService.post<UploadChatFileResponse>(
+      API_ROUTES.file.uploadFile,
       payload,
       {
         headers: {
