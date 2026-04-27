@@ -1,4 +1,6 @@
 export const images = {
+  /** Faint Ganesha + zodiac circle for IncomingChatRequestScreen */
+  incomingChatWatermark: require('./incoming-chat-watermark.png'),
   appBackground: require('./app-background.png'),
   logo: require('./logo.png'),
   loaderGif: require('./logo-animated.gif'),

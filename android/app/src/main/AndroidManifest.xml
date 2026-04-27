@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Android 13+ : system notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Incoming chat: allow full-screen intent notification (Android 10+, user may disable in settings) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
       android:name=".MainApplication"

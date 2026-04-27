@@ -1,4 +1,8 @@
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, {
+  AndroidCategory,
+  AndroidImportance,
+  AndroidVisibility,
+} from '@notifee/react-native';
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 
@@ -75,7 +79,15 @@ export async function showLocalNotificationFromRemoteMessage(
       body,
       android: {
         channelId,
+        importance: AndroidImportance.HIGH,
+        visibility: AndroidVisibility.PUBLIC,
         smallIcon: 'ic_launcher',
+        /** Incoming call / chat style — helps heads-up + full-screen on supported devices */
+        category: AndroidCategory.CALL,
+        /** Brings MainActivity on top when device is locked / screen off (needs manifest permission). */
+        fullScreenAction: {
+          id: 'incoming_chat_fullscreen',
+        },
         pressAction: {
           id: 'default',
         },
