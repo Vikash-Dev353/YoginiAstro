@@ -125,9 +125,12 @@ function inferMimeFromName(name: string): string {
   if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".mkv")) {
     return "video/mp4";
   }
-  if (lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav")) {
+  if (lower.endsWith(".mp3")) {
     return "audio/mpeg";
   }
+  if (lower.endsWith(".m4a")) return "audio/mp4";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  if (lower.endsWith(".aac")) return "audio/aac";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".png")) return "image/png";
   return "application/octet-stream";
@@ -506,7 +509,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
       await sendAttachment({
         uri: recordedUri,
         name: `recording-${Date.now()}.m4a`,
-        type: "audio/m4a",
+        type: "audio/mp4",
       });
     } catch {
       setIsRecordingAudio(false);

@@ -118,6 +118,8 @@ dependencies {
     }
 }
 
+apply plugin: "com.google.gms.google-services"
+
 // Ensure stale autolinking artifacts are regenerated before native clean tasks.
 afterEvaluate {
     tasks.matching { task ->
