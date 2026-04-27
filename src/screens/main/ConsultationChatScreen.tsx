@@ -338,7 +338,13 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
           uploadResponse.data?.fileUrl ||
           uploadResponse.data?.url;
 
-        if (!uploadedFileUrl || uploadResponse.status !== "Success") {
+        const normalizedStatus = (uploadResponse.status || "").toLowerCase();
+        const isUploadAccepted =
+          normalizedStatus.length === 0 ||
+          normalizedStatus === "success" ||
+          normalizedStatus === "ok";
+
+        if (!uploadedFileUrl || !isUploadAccepted) {
           throw new Error(uploadResponse.message || "Unable to upload attachment.");
         }
 

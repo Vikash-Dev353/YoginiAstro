@@ -1,7 +1,7 @@
 export const API_ROUTES = {
   auth: {
-    sendOtp: "/astro/login/send-otp",
-    sendRegisterOtp: "/astro/register/send-otp",
+    sendOtp: "/astro/send-otp",
+    sendRegisterOtp: "/astro/send-otp",
     verifyRegisterOtp: "/astro/register/verify-otp",
     verifyOtp: "/astro/login/verify-otp",
     getOnline: "/astro/get-online",

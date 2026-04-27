@@ -5,7 +5,6 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OtpVerificationScreen } from '../screens/auth/OtpVerificationScreen';
 import { PendingApprovalScreen } from '../screens/auth/PendingApprovalScreen';
 import { PrivacyPolicyScreen } from '../screens/auth/PrivacyPolicyScreen';
-import { SignupScreen } from '../screens/auth/SignupScreen';
 import { TermsAndConditionsScreen } from '../screens/auth/TermsAndConditionsScreen';
 import { CompleteProfileScreen } from '../screens/profile/CompleteProfileScreen';
 import { useAppSelector } from '../store/hooks';
@@ -43,7 +42,7 @@ export function AuthNavigator() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
-      <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="Signup" component={LoginScreen} />
       <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
       <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} />
       <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />

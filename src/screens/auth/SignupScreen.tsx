@@ -18,7 +18,7 @@ import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { clearAuthError, sendRegisterOtp } from '../../store/slices/authSlice';
+import { clearAuthError, sendOtp } from '../../store/slices/authSlice';
 import { hp, normalizeFont, wp } from '../../utils/responsive';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
@@ -53,7 +53,7 @@ function SignupScreenComponent({ navigation }: Props) {
     dispatch(clearAuthError());
 
     try {
-      const response = await dispatch(sendRegisterOtp({ mobile })).unwrap();
+      const response = await dispatch(sendOtp({ mobile })).unwrap();
       if (response.status?.toLowerCase() === 'success') {
         navigation.navigate('OtpVerification', { mobile, flow: 'register' });
         return;

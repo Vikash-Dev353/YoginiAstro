@@ -133,14 +133,14 @@ function LoginScreenComponent({ navigation }: Props) {
               loading={loading}
             />
 
-            <View style={styles.signupRow}>
+            {/* <View style={styles.signupRow}>
               <Text style={styles.signupHint}>{t('auth.noAccount')}</Text>
               <Pressable onPress={onSignupPress}>
                 <Text style={styles.signupLink}>{` ${t(
                   'common.signup',
                 )}`}</Text>
               </Pressable>
-            </View>
+            </View> */}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

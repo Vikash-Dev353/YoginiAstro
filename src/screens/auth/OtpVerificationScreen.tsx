@@ -22,7 +22,6 @@ import {
   applyAuthGate,
   decodeAstroIdFromToken,
   sendOtp,
-  sendRegisterOtp,
   setAuthenticatedSession,
   verifyOtp,
   verifyRegisterOtp,
@@ -115,10 +114,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
     }
     setLoading(true);
     setError("");
-    const sendResend =
-      flow === "register"
-        ? dispatch(sendRegisterOtp({ mobile }))
-        : dispatch(sendOtp({ mobile }));
+    const sendResend = dispatch(sendOtp({ mobile }));
 
     sendResend
       .unwrap()

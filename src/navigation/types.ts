@@ -8,7 +8,7 @@ export type AuthStackParamList = {
   PendingApproval: undefined;
   OtpVerification: {
     mobile: string;
-    /** Register flow uses `astrologer/register/send-otp`; login uses login send-otp */
+    /** Register/login both use same send-otp endpoint; flow only affects verify step. */
     flow?: 'login' | 'register';
   };
   TermsAndConditions: undefined;

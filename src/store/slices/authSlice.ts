@@ -167,7 +167,7 @@ export const sendRegisterOtp = createAsyncThunk(
   'auth/sendRegisterOtp',
   async (payload: { mobile: string }, { rejectWithValue }) => {
     try {
-      const response = await authApi.sendRegisterOtp(payload);
+      const response = await authApi.sendOtp(payload);
       return response;
     } catch (error) {
       const errorMessage =
