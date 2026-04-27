@@ -28,6 +28,11 @@ import {
   flushPendingWaitlistFcmNavigation,
   handleIncomingFcm,
 } from '../services/push/incomingChatFromFcm';
+import { fcmTrace } from '../services/push/fcmDebug';
+import {
+  initializeLocalNotifications,
+  showLocalNotificationFromRemoteMessage,
+} from '../services/push/notificationDisplay';
 import { navigationRef } from './navigationRef';
 
 const navigationTheme = {
@@ -76,6 +81,10 @@ export function RootNavigator() {
     dispatch(bootstrapAuth());
     dispatch(bootstrapLanguage());
   }, [dispatch]);
+
+  useEffect(() => {
+    void initializeLocalNotifications();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -148,23 +157,33 @@ export function RootNavigator() {
 
     const onRemote = (
       remoteMessage: FirebaseMessagingTypes.RemoteMessage | null | undefined,
+      source: string,
     ) => {
-      if (!remoteMessage) return;
+      if (!remoteMessage) {
+        fcmTrace(`FCM handler [${source}] empty remoteMessage`);
+        return;
+      }
+      fcmTrace(
+        `FCM handler [${source}] messageId=`,
+        remoteMessage.messageId ?? '(none)',
+      );
       handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
     };
 
     const unsubOpened = messaging().onNotificationOpenedApp(remoteMessage => {
-      onRemote(remoteMessage);
+      onRemote(remoteMessage, 'onNotificationOpenedApp');
     });
 
     const unsubForeground = messaging().onMessage(remoteMessage => {
-      onRemote(remoteMessage);
+      fcmTrace('FCM foreground onMessage → local notification + handle');
+      void showLocalNotificationFromRemoteMessage(remoteMessage);
+      onRemote(remoteMessage, 'onMessage');
     });
 
     void messaging()
       .getInitialNotification()
       .then(remoteMessage => {
-        onRemote(remoteMessage ?? undefined);
+        onRemote(remoteMessage ?? undefined, 'getInitialNotification');
       });
 
     return () => {

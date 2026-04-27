@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApp, getApps } from "@react-native-firebase/app";
+import { fcmTrace } from "../push/fcmDebug";
 import {
   AuthorizationStatus,
   getMessaging,
@@ -137,6 +138,12 @@ async function getFcmTokenWithRetry(): Promise<string | null> {
     try {
       const token = await getToken(messaging);
       if (token?.trim()) {
+        fcmTrace(
+          "FCM getToken OK (register path) len=",
+          token.length,
+          "tail=",
+          token.slice(-12),
+        );
         return token.trim();
       }
     } catch (e) {

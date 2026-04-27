@@ -3,6 +3,7 @@ import type { AppDispatch } from '../../store';
 import type { ChatRequestItem } from '../../store/slices/socketSlice';
 import { prependChatRequest } from '../../store/slices/socketSlice';
 import { navigationRef } from '../../navigation/navigationRef';
+import { fcmTrace, fcmTraceError } from './fcmDebug';
 
 /** If user tapped a waitlist notification before login, open Waitlist after session is ready. */
 let pendingWaitlistMessage: FirebaseMessagingTypes.RemoteMessage | null = null;
@@ -27,14 +28,28 @@ export function applyIncomingChatFromFcm(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
 ): boolean {
   const data = remoteMessage.data ?? {};
+  fcmTrace(
+    'applyIncomingChatFromFcm messageId=',
+    remoteMessage.messageId ?? '(none)',
+    'type=',
+    String(data.type ?? ''),
+    'roomId=',
+    String(data.roomId ?? ''),
+    'senderId=',
+    String(data.senderId ?? data.from ?? ''),
+  );
   const typeRaw = String(data.type ?? '').trim().toLowerCase();
   if (typeRaw && typeRaw !== 'incoming_chat') {
+    fcmTrace('applyIncomingChatFromFcm SKIP (not incoming_chat type)');
     return false;
   }
 
   const roomId = String(data.roomId ?? '').trim();
   const from = String(data.senderId ?? data.from ?? '').trim();
   if (!roomId || !from) {
+    fcmTrace(
+      'applyIncomingChatFromFcm SKIP missing roomId or senderId/from',
+    );
     return false;
   }
 
@@ -82,6 +97,7 @@ export function applyIncomingChatFromFcm(
   }
 
   dispatch(prependChatRequest(item));
+  fcmTrace('applyIncomingChatFromFcm OK prependChatRequest roomId=', roomId);
   return true;
 }
 
@@ -110,13 +126,26 @@ export function tryOpenWaitlistFromFcmData(
     return;
   }
 
+  fcmTrace(
+    'tryOpenWaitlistFromFcmData start messageId=',
+    remoteMessage.messageId ?? '(none)',
+  );
   let attempts = 0;
   const tryNav = () => {
     attempts += 1;
     if (attempts > MAX_NAV_RETRIES) {
+      fcmTraceError(
+        'tryOpenWaitlistFromFcmData ABORT navigationRef never became ready',
+      );
       return;
     }
     if (!navigationRef.isReady()) {
+      fcmTrace(
+        'tryOpenWaitlistFromFcmData wait navigationRef attempt',
+        attempts,
+        '/',
+        MAX_NAV_RETRIES,
+      );
       setTimeout(tryNav, 120);
       return;
     }
@@ -124,6 +153,7 @@ export function tryOpenWaitlistFromFcmData(
       screen: 'OrderList',
       params: { initialTab: 'Waitlist' },
     });
+    fcmTrace('tryOpenWaitlistFromFcmData NAVIGATE Order → Waitlist OK');
   };
   tryNav();
 }
@@ -136,14 +166,27 @@ export function handleIncomingFcm(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
   canEnterMainApp: boolean,
 ): void {
+  fcmTrace(
+    'handleIncomingFcm canEnterMainApp=',
+    canEnterMainApp,
+    'messageId=',
+    remoteMessage.messageId ?? '(none)',
+  );
   if (applyIncomingChatFromFcm(dispatch, remoteMessage)) {
     return;
   }
   const data = remoteMessage.data ?? {};
   if (!isWaitlistUpdatePayload(data as Record<string, string>)) {
+    fcmTrace(
+      'handleIncomingFcm no waitlist payload — raw data keys:',
+      data ? Object.keys(data).join(',') : '(none)',
+    );
     return;
   }
   if (!canEnterMainApp) {
+    fcmTrace(
+      'handleIncomingFcm queue waitlist open until login (pendingWaitlistMessage set)',
+    );
     pendingWaitlistMessage = remoteMessage;
     return;
   }
@@ -155,6 +198,7 @@ export function flushPendingWaitlistFcmNavigation(canEnterMainApp: boolean): voi
   if (!canEnterMainApp || !pendingWaitlistMessage) {
     return;
   }
+  fcmTrace('flushPendingWaitlistFcmNavigation running deferred waitlist open');
   const msg = pendingWaitlistMessage;
   pendingWaitlistMessage = null;
   tryOpenWaitlistFromFcmData(msg);

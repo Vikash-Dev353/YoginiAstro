@@ -8,12 +8,18 @@ import messaging from '@react-native-firebase/messaging';
 import { AppRegistry } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
+import { fcmTrace } from './src/services/push/fcmDebug';
+import { showLocalNotificationFromRemoteMessage } from './src/services/push/notificationDisplay';
 
 /** Required headless handler for data messages on Android; tap-to-open uses getInitialNotification in JS. */
 messaging().setBackgroundMessageHandler(async remoteMessage => {
-  if (__DEV__) {
-    console.log('[fcm] background message', remoteMessage?.messageId);
-  }
+  fcmTrace(
+    'setBackgroundMessageHandler messageId=',
+    remoteMessage?.messageId ?? '(none)',
+    'collapseKey=',
+    remoteMessage?.collapseKey ?? '',
+  );
+  await showLocalNotificationFromRemoteMessage(remoteMessage);
 });
 
 AppRegistry.registerComponent(appName, () => App);
