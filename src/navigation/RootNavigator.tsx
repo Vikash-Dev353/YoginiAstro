@@ -1,6 +1,15 @@
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import {
+  AppState,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type AppStateStatus,
+} from 'react-native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { attachDeviceToUser } from '../services/device/registerDevice';
@@ -9,6 +18,10 @@ import { bootstrapAuth, decodeAstroIdFromToken } from '../store/slices/authSlice
 import { bootstrapLanguage } from '../store/slices/languageSlice';
 import { syncSocketSession } from '../store/slices/socketSlice';
 import { AppLoader } from '../components/common/AppLoader';
+import {
+  checkForAppUpdate,
+  type UpdateDecision,
+} from '../services/update/appUpdateService';
 
 const navigationTheme = {
   ...DefaultTheme,
@@ -40,6 +53,8 @@ export function RootNavigator() {
   const [appState, setAppState] = useState<AppStateStatus>(() =>
     AppState.currentState,
   );
+  const [updateDecision, setUpdateDecision] = useState<UpdateDecision | null>(null);
+  const [optionalPromptShown, setOptionalPromptShown] = useState(false);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -54,6 +69,23 @@ export function RootNavigator() {
     dispatch(bootstrapAuth());
     dispatch(bootstrapLanguage());
   }, [dispatch]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      try {
+        const decision = await checkForAppUpdate();
+        if (!active) return;
+        setUpdateDecision(decision);
+      } catch {
+        // Non-blocking: app should work even if config fetch fails.
+      }
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!canEnterMainApp || !token) {
@@ -88,13 +120,116 @@ export function RootNavigator() {
     }
   }, [token, isAppForeground, astroId, dispatch]);
 
+  const onOpenStore = () => {
+    const url = updateDecision?.storeUrl;
+    if (!url) return;
+    void Linking.openURL(url);
+  };
+
+  useEffect(() => {
+    if (!updateDecision || updateDecision.mode !== 'optional' || optionalPromptShown) {
+      return;
+    }
+    setOptionalPromptShown(true);
+  }, [optionalPromptShown, updateDecision]);
+
   if (isBootstrapping || isLanguageBootstrapping) {
     return <AppLoader />;
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
-      {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <>
+      <NavigationContainer theme={navigationTheme}>
+        {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+
+      {updateDecision?.mode === 'optional' && optionalPromptShown ? (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.overlay}>
+            <View style={styles.card}>
+              <Text style={styles.title}>{updateDecision.title}</Text>
+              <Text style={styles.message}>{updateDecision.message}</Text>
+              <View style={styles.actions}>
+                <Pressable
+                  onPress={() => setOptionalPromptShown(false)}
+                  style={[styles.button, styles.laterButton]}
+                >
+                  <Text style={styles.laterText}>Later</Text>
+                </Pressable>
+                <Pressable onPress={onOpenStore} style={[styles.button, styles.updateButton]}>
+                  <Text style={styles.updateText}>Update</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
+      {updateDecision?.mode === 'force' ? (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.overlay}>
+            <View style={styles.card}>
+              <Text style={styles.title}>{updateDecision.title}</Text>
+              <Text style={styles.message}>{updateDecision.message}</Text>
+              <Pressable onPress={onOpenStore} style={[styles.button, styles.updateButton]}>
+                <Text style={styles.updateText}>Update Now</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 18,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E1E1E',
+  },
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#3A3A3A',
+  },
+  actions: {
+    marginTop: 18,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  button: {
+    minWidth: 94,
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  laterButton: {
+    backgroundColor: '#EFEFEF',
+  },
+  updateButton: {
+    backgroundColor: '#632B27',
+  },
+  laterText: {
+    fontWeight: '600',
+    color: '#444444',
+  },
+  updateText: {
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+});

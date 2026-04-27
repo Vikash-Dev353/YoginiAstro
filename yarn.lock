@@ -2884,6 +2884,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-firebase/remote-config@npm:^24.0.0":
+  version: 24.0.0
+  resolution: "@react-native-firebase/remote-config@npm:24.0.0"
+  dependencies:
+    react-native-fetch-api: ^3.0.0
+    text-encoding: ^0.7.0
+    web-streams-polyfill: ^4.2.0
+  peerDependencies:
+    "@react-native-firebase/analytics": 24.0.0
+    "@react-native-firebase/app": 24.0.0
+  checksum: 54e1aa12ca8131ba44a7a0f5cea174044dfdfe8786bd2520fd21242fd6200c25c2fd59fe3a641b46f3fb3b2fcbe5470e3883cc5026c6a8b7ed32e847a591e9cf
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.84.0":
   version: 0.84.0
   resolution: "@react-native/assets-registry@npm:0.84.0"
@@ -3646,6 +3660,7 @@ __metadata:
     "@react-native-documents/picker": ^12.0.1
     "@react-native-firebase/app": ^24.0.0
     "@react-native-firebase/messaging": ^24.0.0
+    "@react-native-firebase/remote-config": ^24.0.0
     "@react-native/babel-preset": 0.84.0
     "@react-native/eslint-config": 0.84.0
     "@react-native/metro-config": 0.84.0
@@ -3667,6 +3682,7 @@ __metadata:
     react-native: 0.84.0
     react-native-audio-recorder-player: 3.6.14
     react-native-blob-util: ^0.24.7
+    react-native-device-info: ^15.0.2
     react-native-gesture-handler: ^2.30.0
     react-native-gifted-charts: ^1.4.74
     react-native-image-picker: ^8.2.1
@@ -8500,6 +8516,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"p-defer@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "p-defer@npm:3.0.0"
+  checksum: ac3b0976a1c76b67cca1a34e00f7299b0cc230891f820749686aa84f8947326bbe0f8e3b7d9ca511578ee06f0c1a6e0ff68c8e9c325eac455f09d99f91697161
+  languageName: node
+  linkType: hard
+
 "p-limit@npm:^2.2.0":
   version: 2.3.0
   resolution: "p-limit@npm:2.3.0"
@@ -8907,6 +8930,24 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: d681da0b474e735421175d8f7869069543070cb9fca7ecc873e65c425d997c88e10ff1ad4c962aab2e753749c94c22f56769ba11ce037d2221cc4b569bde35ce
+  languageName: node
+  linkType: hard
+
+"react-native-device-info@npm:^15.0.2":
+  version: 15.0.2
+  resolution: "react-native-device-info@npm:15.0.2"
+  peerDependencies:
+    react-native: "*"
+  checksum: 932ec7ccfc885aeb39c455b31c55a1b345bd6fcfc8cf22f63fff88f42aefc82bf44e4b05daeaaa1231c4ea8590f25740ce6a0f38bc24a5c89d68702de832e8d6
+  languageName: node
+  linkType: hard
+
+"react-native-fetch-api@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "react-native-fetch-api@npm:3.0.0"
+  dependencies:
+    p-defer: ^3.0.0
+  checksum: f10f435060551c470711ba0b3663e3d49c7701aae84ea645d66992d756b13e923fb5762b324d3583d85c1c0def4138b9cc3f686bab1c1bc10d3ad82dc7175c99
   languageName: node
   linkType: hard
 
@@ -10095,6 +10136,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"text-encoding@npm:^0.7.0":
+  version: 0.7.0
+  resolution: "text-encoding@npm:0.7.0"
+  checksum: b6109a843fb1b8748b32e1ecd6df74d370f46c13ac136bcb6ca15db70209bb0b8ec1f296ebb4b0dd9961150e205dcc044b89f8cf7657f6faef78c7569a2a81bc
+  languageName: node
+  linkType: hard
+
 "text-table@npm:^0.2.0":
   version: 0.2.0
   resolution: "text-table@npm:0.2.0"
@@ -10458,6 +10506,13 @@ __metadata:
   dependencies:
     defaults: ^1.0.3
   checksum: 814e9d1ddcc9798f7377ffa448a5a3892232b9275ebb30a41b529607691c0491de47cba426e917a4d08ded3ee7e9ba2f3fe32e62ee3cd9c7d3bafb7754bd553c
+  languageName: node
+  linkType: hard
+
+"web-streams-polyfill@npm:^4.2.0":
+  version: 4.2.0
+  resolution: "web-streams-polyfill@npm:4.2.0"
+  checksum: 21aba196470e4814ae7f475540c454145fabf72d3755fb51256f48a710302d7a203e4a519c185715c4d9a09c6201df9cc14c02fc2a0bfd64f2667b18bad96ca9
   languageName: node
   linkType: hard
 
