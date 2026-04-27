@@ -1,4 +1,6 @@
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import messaging from '@react-native-firebase/messaging';
+import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import { useEffect, useState } from 'react';
 import {
   AppState,
@@ -22,6 +24,11 @@ import {
   checkForAppUpdate,
   type UpdateDecision,
 } from '../services/update/appUpdateService';
+import {
+  flushPendingWaitlistFcmNavigation,
+  handleIncomingFcm,
+} from '../services/push/incomingChatFromFcm';
+import { navigationRef } from './navigationRef';
 
 const navigationTheme = {
   ...DefaultTheme,
@@ -133,13 +140,50 @@ export function RootNavigator() {
     setOptionalPromptShown(true);
   }, [optionalPromptShown, updateDecision]);
 
+  /** FCM: incoming chat OR waitlist tab (matches backend waitlist_update payload). */
+  useEffect(() => {
+    if (isBootstrapping || isLanguageBootstrapping) {
+      return;
+    }
+
+    const onRemote = (
+      remoteMessage: FirebaseMessagingTypes.RemoteMessage | null | undefined,
+    ) => {
+      if (!remoteMessage) return;
+      handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
+    };
+
+    const unsubOpened = messaging().onNotificationOpenedApp(remoteMessage => {
+      onRemote(remoteMessage);
+    });
+
+    const unsubForeground = messaging().onMessage(remoteMessage => {
+      onRemote(remoteMessage);
+    });
+
+    void messaging()
+      .getInitialNotification()
+      .then(remoteMessage => {
+        onRemote(remoteMessage ?? undefined);
+      });
+
+    return () => {
+      unsubOpened();
+      unsubForeground();
+    };
+  }, [dispatch, isBootstrapping, isLanguageBootstrapping, canEnterMainApp]);
+
+  useEffect(() => {
+    flushPendingWaitlistFcmNavigation(canEnterMainApp);
+  }, [canEnterMainApp]);
+
   if (isBootstrapping || isLanguageBootstrapping) {
     return <AppLoader />;
   }
 
   return (
     <>
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
       </NavigationContainer>
 

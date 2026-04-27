@@ -24,6 +24,8 @@ export type OrderStackParamList = {
     customerName: string;
     customerImage?: string | null;
     message?: string;
+    /** Line under name, e.g. “Yoginiastro User” */
+    subtitle?: string;
     kundliUrl?: string;
     kundaliPayload?: GenerateKundaliPayload;
     userBalance?: number;

@@ -46,6 +46,8 @@ export type ChatRequestItem = {
   };
   balance?: { balance?: number };
   astroData?: { price?: number };
+  /** Shown under customer name on incoming chat screen */
+  subtitle?: string;
   [key: string]: unknown;
 };
 
@@ -143,6 +145,17 @@ const socketSlice = createSlice({
       state.chatRequests = chatRequests.filter(
         (r) => r.roomId !== action.payload
       );
+    },
+    prependChatRequest: (state, action: PayloadAction<ChatRequestItem>) => {
+      const incoming = action.payload;
+      if (!incoming?.roomId) {
+        return;
+      }
+      const list = Array.isArray(state.chatRequests)
+        ? [...state.chatRequests]
+        : [];
+      const filtered = list.filter((r) => r.roomId !== incoming.roomId);
+      state.chatRequests = [incoming, ...filtered];
     },
     setWaitlistCount: (state, action: PayloadAction<number>) => {
       state.waitlistCount = action.payload;
@@ -458,6 +471,7 @@ export const {
   setChatDisconnect: setSocketChatDisconnect,
   setTimerStart: setSocketTimerStart,
   setUserFree: setSocketUserFree,
+  prependChatRequest,
 } = socketSlice.actions;
 
 export const socketReducer = socketSlice.reducer;

@@ -26,6 +26,7 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
     customerName,
     customerImage,
     message,
+    subtitle,
     kundliUrl,
     kundaliPayload,
     userBalance,
@@ -101,7 +102,9 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
         <View style={styles.centerWrap}>
           <Image source={avatarSource} style={styles.avatar} resizeMode="cover" />
           <Text style={styles.name}>{customerName}</Text>
-          <Text style={styles.subtitle}>Yoginiastro User</Text>
+          <Text style={styles.subtitle}>
+            {subtitle?.trim() || "Yoginiastro User"}
+          </Text>
           <Text style={styles.message} numberOfLines={2}>
             {message?.trim() || "Wants to chat with you."}
           </Text>

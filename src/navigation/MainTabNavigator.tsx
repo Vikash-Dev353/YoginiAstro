@@ -53,6 +53,7 @@ const CustomTabBar = memo(
             'Unknown User',
           customerImage: firstRequest.userData?.profileImage ?? firstRequest.senderImage,
           message: firstRequest.message,
+          subtitle: firstRequest.subtitle,
           kundliUrl: firstRequest.kundliUrl,
           kundaliPayload: parseKundliUrlToPayload(firstRequest.kundliUrl),
           userBalance: firstRequest.balance?.balance,
