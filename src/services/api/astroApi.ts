@@ -334,10 +334,37 @@ export type GetMonthlyEarningsPayload = { astroId: string };
 export type GetMonthlyEarningsResponse = {
   status: string;
   astroId: string;
-  balance: { totalAvailable: number; currency: string };
-  weeklyEarnings: { total: string; chartData: WalletChartPoint[] };
-  monthlyEarnings: WalletMonthlyEarning[];
-  payableAmount: { amount: string; amountValue: number };
+  chat?: {
+    totalSessions?: number;
+    totalActualSeconds?: number;
+    totalBilledSeconds?: number;
+    totalMinutes?: number;
+    pricePerMinute?: number;
+    grossEarning?: number;
+  };
+  call?: {
+    totalCalls?: number;
+    totalActualSeconds?: number;
+    totalBilledSeconds?: number;
+    totalMinutes?: number;
+    grossEarning?: number;
+  };
+  calculation?: {
+    totalGrossEarning?: number;
+    astrologerShare_40_percent?: number;
+    tds_10_percent_on_astrologer?: number;
+    finalPayableToAstrologer?: number;
+    platformRevenue_60_percent?: number;
+  };
+  monthRange?: {
+    start?: string;
+    end?: string;
+  };
+  // keep backward compatibility with older payload shape used elsewhere
+  balance?: { totalAvailable: number; currency: string };
+  weeklyEarnings?: { total: string; chartData: WalletChartPoint[] };
+  monthlyEarnings?: WalletMonthlyEarning[];
+  payableAmount?: { amount: string; amountValue: number };
 };
 
 /** Chat history / recent consultations – add more keys here as backend sends them */

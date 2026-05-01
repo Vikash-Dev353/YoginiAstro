@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/common/AppButton';
 import { AppHeader } from '../../components/common/AppHeader';
 import { SettingListItem } from '../../components/profile/SettingListItem';
@@ -18,6 +18,9 @@ export function SettingScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  const footerBottom = Math.max(tabBarHeight, insets.bottom) + 12;
+  const footerEstimatedHeight = 56;
   const settingItems = [
     { key: 'pay-slip', title: t('profile.paySlip'), iconLabel: 'PS' },
     { key: 'download-form', title: t('profile.downloadForm'), iconLabel: 'D' },
@@ -52,7 +55,7 @@ export function SettingScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: tabBarHeight + 126 },
+          { paddingBottom: footerBottom + footerEstimatedHeight + 20 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -66,7 +69,7 @@ export function SettingScreen({ navigation }: Props) {
         ))}
       </ScrollView>
 
-      <View style={[styles.footer, { bottom: tabBarHeight + 18 }]}>
+      <View style={[styles.footer, { bottom: footerBottom }]}>
         <AppButton title={t('profile.clearDataLogout')} onPress={onLogoutPress} />
       </View>
     </SafeAreaView>
@@ -87,5 +90,7 @@ const styles = StyleSheet.create({
     left: wp(4.5),
     right: wp(4.5),
     bottom: 30,
+    zIndex: 20,
+    elevation: 20,
   },
 });

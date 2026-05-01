@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import {
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -205,6 +206,7 @@ export function OrderScreen({ route, navigation }: Props) {
   const [callHistory, setCallHistory] = useState<CallHistoryItem[]>([]);
   const [isCallHistoryLoading, setIsCallHistoryLoading] = useState(false);
   const [callHistoryError, setCallHistoryError] = useState<string | null>(null);
+  const [rejectedRequestIds, setRejectedRequestIds] = useState<string[]>([]);
   const [orderFocusKey, setOrderFocusKey] = useState(0);
   const socketChatRequests = useAppSelector(selectChatRequests);
 
@@ -379,8 +381,17 @@ export function OrderScreen({ route, navigation }: Props) {
         id: c.orderId,
         orderId: c.orderId,
         name: c.userName ?? "—",
-        timeLabel: formatChatDate(c.createdAt),
-        rate: c.rate != null ? String(c.rate) : "—",
+        timeLabel: formatChatDate(
+          (c as ConsultationItem & { endedAt?: string }).endedAt || c.createdAt
+        ),
+        rate:
+          (c as ConsultationItem & { pricePerMinute?: string | number })
+            .pricePerMinute != null
+            ? String(
+                (c as ConsultationItem & { pricePerMinute?: string | number })
+                  .pricePerMinute
+              )
+            : "—",
         duration: c.duration != null ? String(c.duration) : "—",
         amount:
           typeof c.amount === "number"
@@ -401,23 +412,25 @@ export function OrderScreen({ route, navigation }: Props) {
       case "Waitlist":
       default:
         if (socketChatRequests.length > 0) {
-          return socketChatRequests.map((request, index) => ({
-            id: request.roomId || `${request.senderId || request.from}-${index}`,
-            from: request.senderId || request.from,
-            name:
-              request.userData?.fullName ||
-              request.senderName ||
-              "Unknown",
-            message: request.message || wantsToChatFallback,
-            timeLabel: getRequestedTimeLabel(request.requestedAt),
-            kundliUrl: request.kundliUrl,
-            generateKundaliPayload: parseKundliUrlToPayload(request.kundliUrl),
-            profileImage: request.userData?.profileImage ?? request.senderImage,
-            userBalance: request.balance?.balance,
-            astroPrice: request.astroData?.price,
-          }));
+          return socketChatRequests
+            .map((request, index) => ({
+              id: request.roomId || `${request.senderId || request.from}-${index}`,
+              from: request.senderId || request.from,
+              name:
+                request.userData?.fullName ||
+                request.senderName ||
+                "Unknown",
+              message: request.message || wantsToChatFallback,
+              timeLabel: getRequestedTimeLabel(request.requestedAt),
+              kundliUrl: request.kundliUrl,
+              generateKundaliPayload: parseKundliUrlToPayload(request.kundliUrl),
+              profileImage: request.userData?.profileImage ?? request.senderImage,
+              userBalance: request.balance?.balance,
+              astroPrice: request.astroData?.price,
+            }))
+            .filter((request) => !rejectedRequestIds.includes(request.id));
         }
-        return waitlistData;
+        return waitlistData.filter((request) => !rejectedRequestIds.includes(request.id));
     }
   }, [
     activeTab,
@@ -425,6 +438,7 @@ export function OrderScreen({ route, navigation }: Props) {
     chatDataForList,
     callDataForList,
     socketChatRequests,
+    rejectedRequestIds,
     wantsToChatFallback,
   ]);
 
@@ -527,6 +541,13 @@ export function OrderScreen({ route, navigation }: Props) {
                     })
                   );
                 }
+                setRejectedRequestIds((prev) =>
+                  prev.includes(waitlistItem.id) ? prev : [...prev, waitlistItem.id]
+                );
+                setWaitlistData((prev) =>
+                  prev.filter((request) => request.id !== waitlistItem.id)
+                );
+                Alert.alert("Request Rejected", "Request rejected successfully.");
               }}
             >
               <Text style={styles.actionButtonText}>{t("common.reject")}</Text>

@@ -58,6 +58,9 @@ function HomeScreenComponent({ navigation }: Props) {
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [selectedLanguage, setSelectedLanguage] =
     useState<AppLanguage>(appLanguage);
+  const [finalPayableToAstrologer, setFinalPayableToAstrologer] = useState<number | null>(
+    null
+  );
 
   const actions = useMemo<ActionItem[]>(
     () => [
@@ -114,6 +117,13 @@ function HomeScreenComponent({ navigation }: Props) {
     [t]
   );
 
+  const earningTitleText = useMemo(() => {
+    if (finalPayableToAstrologer === null) {
+      return t("home.decemberEarning");
+    }
+    return `Monthly Earning - ₹${finalPayableToAstrologer.toFixed(2)}`;
+  }, [finalPayableToAstrologer, t]);
+
   const openLanguageModal = () => {
     setSelectedLanguage(appLanguage);
     setLanguageModalVisible(true);
@@ -158,12 +168,28 @@ function HomeScreenComponent({ navigation }: Props) {
     }
   }, [astroId]);
 
+  const loadMonthlyEarnings = useCallback(async () => {
+    try {
+      const response = await astroApi.getMonthlyEarnings({ astroId });
+      const parsedFinalPayable = Number(
+        response.calculation?.finalPayableToAstrologer
+      );
+
+      if (Number.isFinite(parsedFinalPayable)) {
+        setFinalPayableToAstrologer(parsedFinalPayable);
+      }
+    } catch (error) {
+      console.log("GET MONTHLY EARNINGS ERROR", error);
+    }
+  }, [astroId]);
+
   useEffect(() => {
     if (!token) {
       return;
     }
     loadOnlineStatus();
-  }, [loadOnlineStatus, token]);
+    loadMonthlyEarnings();
+  }, [loadMonthlyEarnings, loadOnlineStatus, token]);
 
   const updateOnlineStatus = useCallback(
     async (nextCallOnline: boolean, nextChatOnline: boolean) => {
@@ -343,10 +369,7 @@ function HomeScreenComponent({ navigation }: Props) {
         <View style={styles.earningCard}>
           <View style={styles.earningRow}>
             <View>
-              <Text style={styles.earningTitle}>
-                {/* {t("home.decemberEarning")} */}
-              </Text>
-              {/* <Text style={styles.invoiceText}>{t("home.invoiceAck")}</Text> */}
+              <Text style={styles.earningTitle}>{earningTitleText}</Text>
             </View>
             <Pressable style={styles.arrowButton}>
               

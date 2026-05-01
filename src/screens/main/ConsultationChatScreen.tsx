@@ -275,6 +275,18 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     navigation.goBack();
   }, [dispatch, navigation, roomId]);
 
+  const onConfirmEndChat = useCallback(() => {
+    Alert.alert(
+      "Confirm",
+      "Are you sure want to close the chat?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes", style: "destructive", onPress: onEnd },
+      ],
+      { cancelable: true }
+    );
+  }, [onEnd]);
+
   const onOpenKundli = useCallback(() => {
     navigation.navigate("ViewKundli", {
       name: customerName,
@@ -876,7 +888,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         </View>
         <View style={styles.headerRight}>
           <Pressable
-            onPress={onEnd}
+            onPress={onConfirmEndChat}
             style={styles.endButton}
             hitSlop={8}
           >
