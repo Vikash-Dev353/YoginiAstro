@@ -22,4 +22,5 @@ export const images = {
   settings: require('./settings.png'),
   iconamoonProfileCircleFill: require('./iconamoon_profile-circle-fill.png'),
   timerOutline: require('./timer-outline.png'),
+  refreshIcon: require('./refreshIcon.png'),
 } as const;

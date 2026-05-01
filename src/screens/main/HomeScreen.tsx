@@ -17,6 +17,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
 import { AppButton } from "../../components/common/AppButton";
+import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
 import { AppLanguage } from "../../localization/translations";
@@ -61,6 +62,7 @@ function HomeScreenComponent({ navigation }: Props) {
   const [finalPayableToAstrologer, setFinalPayableToAstrologer] = useState<number | null>(
     null
   );
+  const [isHomeDataLoading, setIsHomeDataLoading] = useState(false);
 
   const actions = useMemo<ActionItem[]>(
     () => [
@@ -183,13 +185,21 @@ function HomeScreenComponent({ navigation }: Props) {
     }
   }, [astroId]);
 
+  const refreshHomeData = useCallback(async () => {
+    try {
+      setIsHomeDataLoading(true);
+      await Promise.all([loadOnlineStatus(), loadMonthlyEarnings()]);
+    } finally {
+      setIsHomeDataLoading(false);
+    }
+  }, [loadMonthlyEarnings, loadOnlineStatus]);
+
   useEffect(() => {
     if (!token) {
       return;
     }
-    loadOnlineStatus();
-    loadMonthlyEarnings();
-  }, [loadMonthlyEarnings, loadOnlineStatus, token]);
+    refreshHomeData();
+  }, [refreshHomeData, token]);
 
   const updateOnlineStatus = useCallback(
     async (nextCallOnline: boolean, nextChatOnline: boolean) => {
@@ -294,9 +304,22 @@ function HomeScreenComponent({ navigation }: Props) {
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
       <View style={[styles.headerWrap]}>
         <View style={styles.header}>
-        <View>
-          <Text style={styles.nameText}>{astroName}</Text>
-          <Text style={styles.idText}>{`+91 ${astroMobile}`}</Text>
+        <View style={styles.headerLeftBlock}>
+          <TouchableOpacity
+            onPress={refreshHomeData}
+            disabled={isStatusSyncing}
+            style={styles.refreshIconButton}
+          >
+            <Image
+              source={images.refreshIcon}
+              style={styles.refreshIconImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.nameText}>{astroName}</Text>
+            <Text style={styles.idText}>{`+91 ${astroMobile}`}</Text>
+          </View>
         </View>
         <View style={styles.headerDots}>
           <TouchableOpacity onPress={openSupport}>
@@ -324,6 +347,11 @@ function HomeScreenComponent({ navigation }: Props) {
         </View>
       </View>
 
+      {isHomeDataLoading ? (
+        <View style={styles.loaderWrap}>
+          <AppGifLoader message="Loading..." size={110} />
+        </View>
+      ) : (
       <ScrollView
         bounces={false}
         contentContainerStyle={styles.scrollContent}
@@ -411,6 +439,7 @@ function HomeScreenComponent({ navigation }: Props) {
           ))}
         </View>
       </ScrollView>
+      )}
 
       <Modal
         visible={isLanguageModalVisible}
@@ -482,6 +511,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerLeftBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  refreshIconButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  refreshIconImage: {
+    width: 26,
+    height: 26,
+  },
   nameText: {
     color: "#FFFFFF",
     fontSize: normalizeFont(28 / 2),
@@ -499,6 +543,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingTop: hp(2),
     paddingBottom: 120,
+  },
+  loaderWrap: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
   statusCard: {
     borderRadius: 16,
