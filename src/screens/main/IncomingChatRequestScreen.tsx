@@ -1,17 +1,7 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import {
-  Dimensions,
-  Image,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  Vibration,
-} from "react-native";
+import { Image, ImageBackground, Pressable, StyleSheet, Text, View, Vibration } from "react-native";
 import { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import Video from "react-native-video";
 import { images } from "../../assets/images";
 import { sounds } from "../../assets/sounds";
@@ -24,15 +14,6 @@ import {
   setSocketChatDisconnect,
 } from "../../store/slices/socketSlice";
 import { normalizeFont, wp } from "../../utils/responsive";
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-
-const serif =
-  Platform.select({
-    ios: "Georgia",
-    android: "serif",
-    default: "serif",
-  }) ?? "serif";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "IncomingChatRequest">;
 
@@ -65,9 +46,6 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
       ? { uri: customerImage.trim() }
       : images.iconamoonProfileCircleFill;
 
-  const subtitleText = subtitle?.trim() || "Yoginiastro User";
-  const messageText = message?.trim();
-
   const onAccept = () => {
     setIsAlerting(false);
     Vibration.cancel();
@@ -82,7 +60,7 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
           kundliUrl,
           userBalance,
           astroPrice,
-        }),
+        })
       );
       dispatch(acceptChat({ from, roomId }));
     }
@@ -104,43 +82,8 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
     navigation.getParent()?.navigate("Home", { screen: "HomeMain" });
   };
 
-  const watermarkSize = Math.min(SCREEN_W, SCREEN_H) * 0.92;
-
   return (
-    <View style={styles.flex1}>
-      <Svg
-        width={SCREEN_W}
-        height={SCREEN_H}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      >
-        <Defs>
-          <LinearGradient id="incomingBg" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor="#B07068" />
-            <Stop offset="42%" stopColor="#7A3B36" />
-            <Stop offset="100%" stopColor="#3A1715" />
-          </LinearGradient>
-        </Defs>
-        <Rect width={SCREEN_W} height={SCREEN_H} fill="url(#incomingBg)" />
-      </Svg>
-
-      <Image
-        source={images.incomingChatWatermark}
-        style={[
-          styles.watermark,
-          {
-            width: watermarkSize,
-            height: watermarkSize,
-            marginLeft: -watermarkSize / 2,
-            marginTop: -watermarkSize / 2,
-            left: SCREEN_W / 2,
-            top: SCREEN_H * 0.46,
-          },
-        ]}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-
+    <ImageBackground source={images.appBackground} style={styles.root} resizeMode="cover">
       <Video
         source={sounds.waitlist}
         style={styles.hiddenRingtone}
@@ -155,63 +98,35 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
           console.log("incoming ringtone error", error);
         }}
       />
-
-      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-        <View style={styles.headerBlock}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerWrap}>
           <Image source={avatarSource} style={styles.avatar} resizeMode="cover" />
-          <Text style={styles.name} numberOfLines={2}>
-            {customerName}
+          <Text style={styles.name}>{customerName}</Text>
+          <Text style={styles.subtitle}>
+            {subtitle?.trim() || "Yoginiastro User"}
           </Text>
-          <Text style={styles.subtitle} numberOfLines={2}>
-            {subtitleText}
+          <Text style={styles.message} numberOfLines={2}>
+            {message?.trim() || "Wants to chat with you."}
           </Text>
-          {messageText ? (
-            <Text style={styles.messageHint} numberOfLines={2}>
-              {messageText}
-            </Text>
-          ) : (
-            <Text style={styles.messageHint} numberOfLines={2}>
-              Wants to chat with you.
-            </Text>
-          )}
         </View>
 
         <View style={styles.actionsRow}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionBtn,
-              styles.acceptBtn,
-              pressed && styles.actionPressed,
-            ]}
-            onPress={onAccept}
-          >
+          <Pressable style={[styles.actionBtn, styles.acceptBtn]} onPress={onAccept}>
             <Text style={styles.actionText}>Accept</Text>
           </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionBtn,
-              styles.rejectBtn,
-              pressed && styles.actionPressed,
-            ]}
-            onPress={onReject}
-          >
+          <Pressable style={[styles.actionBtn, styles.rejectBtn]} onPress={onReject}>
             <Text style={styles.actionText}>Reject</Text>
           </Pressable>
         </View>
       </SafeAreaView>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  flex1: {
+  root: {
     flex: 1,
-    backgroundColor: "#3A1715",
-  },
-  watermark: {
-    position: "absolute",
-    opacity: 0.22,
-    zIndex: 0,
+    backgroundColor: "#8D4F4B",
   },
   hiddenRingtone: {
     width: 0,
@@ -219,82 +134,63 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    zIndex: 1,
     justifyContent: "space-between",
-    paddingBottom: 12,
+    paddingVertical: 18,
   },
-  headerBlock: {
+  centerWrap: {
+    marginTop: "25%",
     alignItems: "center",
     paddingHorizontal: wp(8),
-    paddingTop: SCREEN_H * 0.06,
   },
   avatar: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.55)",
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.65)",
     backgroundColor: "#F3E7E7",
   },
   name: {
-    marginTop: 18,
+    marginTop: 14,
     color: "#FFFFFF",
-    fontFamily: serif,
-    fontSize: normalizeFont(28),
-    fontWeight: "600",
+    fontSize: normalizeFont(31 / 1.8),
+    fontWeight: "700",
     textAlign: "center",
-    letterSpacing: 0.3,
   },
   subtitle: {
-    marginTop: 8,
-    color: "rgba(255,255,255,0.88)",
-    fontFamily: serif,
-    fontSize: normalizeFont(14),
-    fontWeight: "400",
-    textAlign: "center",
+    marginTop: 4,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: normalizeFont(12),
+    fontWeight: "500",
   },
-  messageHint: {
-    marginTop: 14,
-    color: "rgba(255,235,235,0.82)",
+  message: {
+    marginTop: 16,
+    color: "#FBECEC",
     fontSize: normalizeFont(13),
     textAlign: "center",
-    paddingHorizontal: wp(6),
   },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: wp(9),
-    paddingBottom: 18,
-    gap: 14,
+    paddingHorizontal: wp(10),
+    paddingBottom: 22,
   },
   actionBtn: {
-    flex: 1,
-    maxWidth: wp(44),
-    height: 52,
-    borderRadius: 8,
+    width: wp(36),
+    height: 48,
+    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  actionPressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
   },
   acceptBtn: {
-    backgroundColor: "#0F9A23",
+    backgroundColor: "#0E8A1E",
   },
   rejectBtn: {
-    backgroundColor: "#D32B1E",
+    backgroundColor: "#CB2518",
   },
   actionText: {
     color: "#FFFFFF",
-    fontFamily: serif,
-    fontSize: normalizeFont(19),
-    fontWeight: "600",
-    letterSpacing: 0.4,
+    fontSize: normalizeFont(18),
+    fontWeight: "700",
   },
 });

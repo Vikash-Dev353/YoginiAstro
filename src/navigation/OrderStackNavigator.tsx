@@ -22,14 +22,7 @@ export function OrderStackNavigator(_props: Props) {
       screenOptions={{ headerShown: false, animation: 'none' }}
     >
       <Stack.Screen name="OrderList" component={OrderScreen} />
-      <Stack.Screen
-        name="IncomingChatRequest"
-        component={IncomingChatRequestScreen}
-        options={{
-          animation: 'fade',
-          gestureEnabled: false,
-        }}
-      />
+      <Stack.Screen name="IncomingChatRequest" component={IncomingChatRequestScreen} />
       <Stack.Screen name="ViewKundli" component={ViewKundliScreen} />
       <Stack.Screen name="ConsultationChat" component={ConsultationChatScreen} />
       <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />

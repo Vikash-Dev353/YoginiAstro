@@ -29,6 +29,7 @@ const logApiRequest = (config: AxiosRequestConfig) => {
   console.log("API REQUEST", {
     method: config.method?.toUpperCase(),
     url: getFullUrl(config),
+    headers: config.headers,
     params: config.params,
     body: config.data,
   });

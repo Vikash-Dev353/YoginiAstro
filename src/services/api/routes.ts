@@ -3,7 +3,7 @@ export const API_ROUTES = {
     sendOtp: "/astro/send-otp",
     sendRegisterOtp: "/astro/send-otp",
     verifyRegisterOtp: "/astro/register/verify-otp",
-    verifyOtp: "/astro/login/verify-otp",
+    verifyOtp: "/astro/verify-otp",
     getOnline: "/astro/get-online",
     setOnline: "/astro/set-online",
     waitlist: (astroId: string) => `/astro/waitlist/${astroId}`,

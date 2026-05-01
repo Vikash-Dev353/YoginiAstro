@@ -344,7 +344,7 @@ function HomeScreenComponent({ navigation }: Props) {
           <View style={styles.earningRow}>
             <View>
               <Text style={styles.earningTitle}>
-                {t("home.decemberEarning")}
+                {/* {t("home.decemberEarning")} */}
               </Text>
               {/* <Text style={styles.invoiceText}>{t("home.invoiceAck")}</Text> */}
             </View>
