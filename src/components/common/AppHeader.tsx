@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../constants/colors';
@@ -8,12 +9,15 @@ type AppHeaderProps = {
   title: string;
   showBack?: boolean;
   onBackPress?: () => void;
+  /** Optional right-side control (e.g. add / menu). Keeps title centered when widths match. */
+  rightAction?: ReactNode;
 };
 
 export function AppHeader({
   title,
   showBack = false,
   onBackPress,
+  rightAction,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
 
@@ -32,7 +36,7 @@ export function AppHeader({
           ) : null}
         </View>
         <Text style={styles.title}>{title}</Text>
-        <View style={styles.rightSlot} />
+        <View style={styles.rightSlot}>{rightAction}</View>
       </View>
     </View>
   );
@@ -52,11 +56,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   leftSlot: {
-    width: 34,
+    minWidth: 44,
     alignItems: 'flex-start',
   },
   rightSlot: {
-    width: 34,
+    minWidth: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   backButton: {
     width: 40,

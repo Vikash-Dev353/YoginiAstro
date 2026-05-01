@@ -1,6 +1,8 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { memo, useEffect, useState } from "react";
 import {
+  Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -10,6 +12,7 @@ import {
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { images } from "../../assets/images";
 import { AppHeader } from "../../components/common/AppHeader";
 import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { colors } from "../../constants/colors";
@@ -217,12 +220,36 @@ function ViewKundliScreenComponent({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const bottomTabHeight = 84 + 10 + 16;
 
+  const onAddKundli = () => {
+    Alert.alert(
+      isHindi ? "कुंडली" : "Kundli",
+      isHindi
+        ? "यह सुविधा जल्द जोड़ी जाएगी।"
+        : "Add kundli flow will be available soon."
+    );
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader
         title={isHindi ? "कुंडली" : "Kundli"}
         showBack
         onBackPress={() => navigation.goBack()}
+        rightAction={
+          <Pressable
+            onPress={onAddKundli}
+            style={styles.headerAddButton}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={isHindi ? "नया जोड़ें" : "Add"}
+          >
+            <Image
+              source={images.addIcon}
+              style={styles.headerAddIcon}
+              resizeMode="contain"
+            />
+          </Pressable>
+        }
       />
 
       <View style={styles.tabBar}>
@@ -656,6 +683,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  headerAddButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4B1B16",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerAddIcon: {
+    width: 22,
+    height: 22,
   },
   tabBar: {
     flexDirection: "row",
