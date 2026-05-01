@@ -50,7 +50,7 @@ export type ProfileStackParamList = {
   CustomerSupport: undefined;
   GoLiveNow: undefined;
   Review: undefined;
-  Setting: undefined;
+  Setting: { fromHomeScreen?: boolean } | undefined;
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;
 };

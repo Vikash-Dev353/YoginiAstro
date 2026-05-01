@@ -870,7 +870,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
         ignoreSilentSwitch="ignore"
         volume={1.0}
       />
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: 12 }]}>
         <View style={styles.headerLeft}>
           <Image
             source={avatarSource}
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     width: "100%",
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 8,
   },
   bubbleRowMine: {

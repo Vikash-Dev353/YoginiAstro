@@ -14,7 +14,7 @@ import { hp, wp } from '../../utils/responsive';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Setting'>;
 
-export function SettingScreen({ navigation }: Props) {
+export function SettingScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
@@ -51,9 +51,19 @@ export function SettingScreen({ navigation }: Props) {
     dispatch(logout());
   };
 
+  const onBackPress = () => {
+    if (route.params?.fromHomeScreen) {
+      navigation
+        .getParent()
+        ?.navigate('Home', { screen: 'HomeMain' });
+      return;
+    }
+    navigation.goBack();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-      <AppHeader title={t('common.setting')} showBack onBackPress={navigation.goBack} />
+      <AppHeader title={t('common.setting')} showBack onBackPress={onBackPress} />
 
       <ScrollView
         contentContainerStyle={[

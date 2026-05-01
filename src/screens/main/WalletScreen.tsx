@@ -4,9 +4,10 @@ import {
 } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppSelector } from "../../store/hooks";
+import { images } from "../../assets/images";
 import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { AppHeader } from "../../components/common/AppHeader";
 import { colors } from "../../constants/colors";
@@ -20,6 +21,11 @@ const LineChartModule = require("react-native-gifted-charts/dist/LineChart");
 const LineChart = LineChartModule?.LineChart;
 function formatCurrency(value: number): string {
   return "₹" + value.toLocaleString("en-IN");
+}
+
+function formatMinutesLabel(value: number): string {
+  const safeMinutes = Number.isFinite(value) ? value : 0;
+  return `${safeMinutes} Min`;
 }
 
 type Props = BottomTabScreenProps<RootTabParamList, "Wallet">;
@@ -61,33 +67,6 @@ export function WalletScreen({ navigation }: Props) {
       fetchWallet();
     }, [fetchWallet])
   );
-
-  const chartWidth = Dimensions.get("window").width - wp(9) - 40;
-  const chartHeight = 200;
-
-  const chartData = useMemo(() => {
-    const raw = walletData?.weeklyEarnings?.chartData ?? [];
-    return Array.isArray(raw)
-      ? raw.map((d) => ({
-          value: Number(d?.value) || 0,
-          label: String(d?.label ?? ""),
-        }))
-      : [];
-  }, [walletData?.weeklyEarnings?.chartData]);
-
-  const chartMaxValue = useMemo(() => {
-    if (chartData.length === 0) return 100;
-    const max = Math.max(...chartData.map((d) => d.value));
-    return max > 0 ? Math.ceil(max * 1.2) : 100;
-  }, [chartData]);
-
-  const last6Months = useMemo(() => {
-    const list = walletData?.monthlyEarnings ?? [];
-
-    console.log("list==>>>>", list);
-    if (!Array.isArray(list)) return [];
-    return list.length <= 6 ? list : list.slice(-6);
-  }, [walletData?.monthlyEarnings]);
 
   const hasToken = Boolean(token);
   const showEmptyState = !loading && !walletData && !error && !hasToken;
@@ -141,9 +120,11 @@ export function WalletScreen({ navigation }: Props) {
   }
 
   const balanceAmount = formatCurrency(
-    walletData?.balance?.totalAvailable ?? 0
+    Number(walletData?.calculation?.finalPayableToAstrologer ?? 0)
   );
   const payableAmount = walletData?.payableAmount?.amount ?? "₹0";
+  const callMinutes = Number(walletData?.call?.totalMinutes ?? 0);
+  const chatMinutes = Number(walletData?.chat?.totalMinutes ?? 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
@@ -162,78 +143,40 @@ export function WalletScreen({ navigation }: Props) {
       >
         <View style={styles.balanceCard}>
           <View style={styles.balanceLeft}>
-            <Text style={styles.balanceTitle}>Total Available Balance</Text>
+            <Text style={styles.balanceTitle}>Current Month Earning</Text>
             <Text style={styles.balanceAmount}>{balanceAmount}</Text>
-            <Text style={styles.balanceSubtitle}>Available Balance</Text>
           </View>
         </View>
 
-        <View
-          style={{
-            paddingLeft: 4,
-            paddingVertical: 12,
-            borderRadius: 16,
-            backgroundColor: "#F7F7F7",
-            elevation: 4,
-            marginVertical: 12,
-            overflow: "hidden",
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 10 }}>
-            Weekly Earnings
-          </Text>
-
-          {LineChart ? (
-            <LineChart
-              data={chartData}
-              width={chartWidth}
-              height={chartHeight}
-              curved
-              areaChart
-              hideDataPoints={false}
-              color="#2E7D32"
-              startFillColor="#2E7D32"
-              endFillColor="#2E7D32"
-              startOpacity={0.4}
-              endOpacity={0.05}
-              thickness={3}
-              dataPointsColor="#A5D6A7"
-              yAxisColor="transparent"
-              xAxisColor="#ccc"
-              yAxisTextStyle={{ color: "#888" }}
-              xAxisLabelTextStyle={{ color: "#666" }}
-              rulesColor="#e0e0e0"
-              yAxisThickness={0}
-              noOfSections={4}
-              maxValue={chartMaxValue}
-            />
-          ) : (
-            <View style={{ height: chartHeight, justifyContent: "center" }}>
-              <Text style={{ color: "#666", textAlign: "center" }}>
-                Chart unavailable
-              </Text>
+       
+        <Text style={styles.sectionTitle}>Monthly Consultation</Text>
+        <View style={styles.consultationRow}>
+          <View style={styles.consultationCard}>
+            <View style={styles.consultationIconCircle}>
+              <Image
+                source={images.call}
+                style={styles.consultationIcon}
+                resizeMode="contain"
+              />
             </View>
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>Last 6 Months Earning</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.monthRow}>
-            {last6Months.map((item) => (
-              <View key={item.id} style={styles.monthCard}>
-                <Text style={styles.monthIcon}>▦</Text>
-                <View>
-                  <Text style={styles.monthLabel}>{item.label}</Text>
-                  <Text style={styles.monthAmount}>{item.amount}</Text>
-                </View>
-              </View>
-            ))}
+            <Text style={styles.consultationLabel}>Call Duration</Text>
+            <Text style={styles.consultationValue}>
+              {formatMinutesLabel(callMinutes)}
+            </Text>
           </View>
-        </ScrollView>
-
-        <View style={styles.payableCard}>
-          <Text style={styles.payableText}>Payable Amount</Text>
-          <Text style={styles.payableAmount}>{payableAmount}</Text>
+          <View style={styles.consultationCard}>
+            <View style={styles.consultationIconCircle}>
+              <Image
+                source={images.chatBubble}
+                style={styles.consultationIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.consultationLabel}>Chat Duration</Text>
+            <Text style={styles.consultationValue}>
+              {formatMinutesLabel(chatMinutes)}
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -402,36 +345,47 @@ const styles = StyleSheet.create({
     fontSize: normalizeFont(13),
     fontWeight: "600",
   },
-  monthRow: {
+  consultationRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingRight: 4,
+    justifyContent: "space-between",
+    gap: 12,
   },
-  monthCard: {
-    width: 214,
-    minHeight: 82,
-    borderRadius: 14,
+  consultationCard: {
+    flex: 1,
+    minHeight: 176,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#D8DCE0",
+    borderColor: "#9E9E9E",
     backgroundColor: "#FFFFFF",
-    flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 16,
   },
-  monthIcon: {
-    fontSize: normalizeFont(23 / 1.2),
-    color: "#4E2A2A",
+  consultationIconCircle: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "#4B1B16",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
-  monthLabel: {
-    color: "#3A2424",
-    fontSize: normalizeFont(17 / 1.2),
+  consultationIcon: {
+    width: 42,
+    height: 42,
+    tintColor: "#FFFFFF",
+  },
+  consultationLabel: {
+    color: "#3A2222",
+    fontSize: normalizeFont(22 / 1.2),
     fontWeight: "700",
+    textAlign: "center",
   },
-  monthAmount: {
-    marginTop: 4,
-    color: "#048A11",
-    fontSize: normalizeFont(30 / 2),
+  consultationValue: {
+    marginTop: 6,
+    color: "#0D7B14",
+    fontSize: normalizeFont(38 / 2),
     fontWeight: "800",
   },
   payableCard: {

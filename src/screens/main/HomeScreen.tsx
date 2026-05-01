@@ -268,7 +268,10 @@ function HomeScreenComponent({ navigation }: Props) {
     }
 
     if (key === "setting") {
-      navigation.navigate("Profile", { screen: "Setting" });
+      navigation.navigate("Profile", {
+        screen: "Setting",
+        params: { fromHomeScreen: true },
+      });
       return;
     }
 
@@ -289,10 +292,6 @@ function HomeScreenComponent({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
-      <View style={{
-        backgroundColor:'#ffffff',
-        height:44,
-      }}></View>
       <View style={[styles.headerWrap]}>
         <View style={styles.header}>
         <View>
