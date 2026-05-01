@@ -1,7 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { memo, useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -221,12 +220,7 @@ function ViewKundliScreenComponent({ route, navigation }: Props) {
   const bottomTabHeight = 84 + 10 + 16;
 
   const onAddKundli = () => {
-    Alert.alert(
-      isHindi ? "कुंडली" : "Kundli",
-      isHindi
-        ? "यह सुविधा जल्द जोड़ी जाएगी।"
-        : "Add kundli flow will be available soon."
-    );
+    navigation.navigate("KundliBirthChart");
   };
 
   return (

@@ -17,6 +17,8 @@ export type AuthStackParamList = {
 
 export type OrderStackParamList = {
   OrderList: { initialTab?: 'Waitlist' | 'Voice Call' | 'Chat' | 'Pooja Booking' } | undefined;
+  /** Birth-details form → replaces ViewKundli with generated payload */
+  KundliBirthChart: undefined;
   ViewKundli: { name: string; id?: string; kundaliPayload?: GenerateKundaliPayload };
   IncomingChatRequest: {
     roomId: string;

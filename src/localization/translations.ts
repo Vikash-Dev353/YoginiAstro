@@ -98,6 +98,8 @@ export const translations = {
       selectGender: 'Select Gender',
       dateOfBirth: 'Date of Birth',
       dobPlaceholder: 'DD/MM/YY',
+      timeOfBirth: 'Time of Birth',
+      enterBirthPlace: 'City or village',
       skills: 'Skills',
       selectSkills: 'Select skills',
       selectSpeciality: 'Select speciality',
@@ -252,6 +254,8 @@ export const translations = {
       selectGender: 'लिंग चुनें',
       dateOfBirth: 'जन्म तिथि',
       dobPlaceholder: 'DD/MM/YY',
+      timeOfBirth: 'जन्म समय',
+      enterBirthPlace: 'शहर या गाँव',
       skills: 'कौशल',
       selectSkills: 'कौशल चुनें',
       selectSpeciality: 'विशेषज्ञता चुनें',
@@ -394,6 +398,8 @@ export type TranslationKey =
   | 'completeProfile.selectGender'
   | 'completeProfile.dateOfBirth'
   | 'completeProfile.dobPlaceholder'
+  | 'completeProfile.timeOfBirth'
+  | 'completeProfile.enterBirthPlace'
   | 'completeProfile.skills'
   | 'completeProfile.selectSkills'
   | 'completeProfile.selectSpeciality'
