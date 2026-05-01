@@ -19,7 +19,10 @@ export function SettingScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
-  const footerBottom = Math.max(tabBarHeight, insets.bottom) + 12;
+  const fallbackTabBarHeight = 72;
+  const effectiveTabBarHeight =
+    tabBarHeight > 0 ? tabBarHeight : fallbackTabBarHeight;
+  const footerBottom = effectiveTabBarHeight + insets.bottom + 8;
   const footerEstimatedHeight = 56;
   const settingItems = [
     { key: 'pay-slip', title: t('profile.paySlip'), iconLabel: 'PS' },
@@ -69,9 +72,9 @@ export function SettingScreen({ navigation }: Props) {
         ))}
       </ScrollView>
 
-      <View style={[styles.footer, { bottom: footerBottom }]}>
+       <View style={[styles.footer, { bottom: footerBottom }]}>
         <AppButton title={t('profile.clearDataLogout')} onPress={onLogoutPress} />
-      </View>
+      </View> 
     </SafeAreaView>
   );
 }
