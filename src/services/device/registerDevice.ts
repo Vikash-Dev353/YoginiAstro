@@ -144,6 +144,10 @@ async function getFcmTokenWithRetry(): Promise<string | null> {
           "tail=",
           token.slice(-12),
         );
+        if (__DEV__) {
+          /** Dev-only: full token so engineers can paste it into a CLI test. */
+          console.log("[FCM_TOKEN_FULL]", token.trim());
+        }
         return token.trim();
       }
     } catch (e) {

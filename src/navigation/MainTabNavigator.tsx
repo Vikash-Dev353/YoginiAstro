@@ -9,6 +9,7 @@ import { images } from '../assets/images';
 import { colors } from '../constants/colors';
 import { useTranslation } from '../localization/useTranslation';
 import { parseKundliUrlToPayload } from '../services/api/astroApi';
+import { foregroundIncomingOverlayActiveRef } from '../services/push/foregroundIncomingOverlay';
 import { selectChatRequests } from '../store/slices/socketSlice';
 import { useAppSelector } from '../store/hooks';
 import { HomeStackNavigator } from './HomeStackNavigator';
@@ -29,6 +30,9 @@ const CustomTabBar = memo(
     const nestedRouteName = getFocusedRouteNameFromRoute(currentTabRoute);
 
     useEffect(() => {
+      if (foregroundIncomingOverlayActiveRef.current) {
+        return;
+      }
       const [firstRequest] = socketChatRequests;
       if (!firstRequest?.roomId) {
         lastNotifiedRoomIdRef.current = null;

@@ -24,4 +24,6 @@ export const images = {
   timerOutline: require('./timer-outline.png'),
   refreshIcon: require('./refreshIcon.png'),
   addIcon: require('./addIcon.png'),
+  /** Low-opacity centre watermark for foreground incoming-chat overlay */
+  incomingPushWatermark: require('./incoming-push-watermark.png'),
 } as const;

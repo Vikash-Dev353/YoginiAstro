@@ -1,7 +1,8 @@
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import messaging from '@react-native-firebase/messaging';
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
-import { useEffect, useState } from 'react';
+import notifee, { EventType } from '@notifee/react-native';
+import { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
   Linking,
@@ -24,16 +25,38 @@ import {
   checkForAppUpdate,
   type UpdateDecision,
 } from '../services/update/appUpdateService';
+import { IncomingChatPushOverlay } from '../components/push/IncomingChatPushOverlay';
+import { foregroundIncomingOverlayActiveRef } from '../services/push/foregroundIncomingOverlay';
 import {
   flushPendingWaitlistFcmNavigation,
+  flattenNotificationData,
+  getIncomingChatParamsFromData,
+  handleIncomingChatNotificationOpen,
   handleIncomingFcm,
 } from '../services/push/incomingChatFromFcm';
 import { fcmTrace } from '../services/push/fcmDebug';
+import { captureFcmMessage } from '../services/push/fcmInspector';
 import {
+  cancelIncomingChatNotifications,
   initializeLocalNotifications,
   showLocalNotificationFromRemoteMessage,
 } from '../services/push/notificationDisplay';
+import {
+  acceptIncomingChatFromPush,
+  rejectIncomingChatFromPush,
+} from '../services/push/incomingChatAcceptFlow';
+import {
+  clearPendingIncomingChat,
+  takePendingIncomingChat,
+} from '../services/push/pendingIncomingChat';
+import {
+  consumeIncomingChatLaunchParams,
+  startIncomingChatNative,
+  stopIncomingChatNative,
+  subscribeIncomingChatIntent,
+} from '../services/push/incomingChatNative';
 import { navigationRef } from './navigationRef';
+import type { OrderStackParamList } from './types';
 
 const navigationTheme = {
   ...DefaultTheme,
@@ -67,6 +90,9 @@ export function RootNavigator() {
   );
   const [updateDecision, setUpdateDecision] = useState<UpdateDecision | null>(null);
   const [optionalPromptShown, setOptionalPromptShown] = useState(false);
+  const [incomingChatOverlay, setIncomingChatOverlay] = useState<
+    OrderStackParamList['IncomingChatRequest'] | null
+  >(null);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -85,6 +111,79 @@ export function RootNavigator() {
   useEffect(() => {
     void initializeLocalNotifications();
   }, []);
+
+  /**
+   * Native foreground service launches MainActivity with intent extras carrying
+   * the chat payload. Read them on every mount + appear-foreground so the
+   * overlay opens regardless of whether JS booted fresh or just resumed.
+   *
+   * Also drains the AsyncStorage fallback (`pendingIncomingChat`) in case the
+   * native bridge isn't available (older builds, iOS).
+   */
+  useEffect(() => {
+    if (
+      isBootstrapping ||
+      isLanguageBootstrapping ||
+      !canEnterMainApp ||
+      !isAppForeground
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const fromIntent = await consumeIncomingChatLaunchParams();
+      if (cancelled) return;
+      if (fromIntent) {
+        fcmTrace(
+          'RootNavigator: launch intent overlay → room=',
+          fromIntent.roomId,
+        );
+        void cancelIncomingChatNotifications();
+        void stopIncomingChatNative();
+        foregroundIncomingOverlayActiveRef.current = true;
+        setIncomingChatOverlay(fromIntent);
+        return;
+      }
+      const fromStorage = await takePendingIncomingChat();
+      if (cancelled || !fromStorage) return;
+      fcmTrace(
+        'RootNavigator: AsyncStorage overlay → room=',
+        fromStorage.roomId,
+      );
+      void cancelIncomingChatNotifications();
+      void stopIncomingChatNative();
+      foregroundIncomingOverlayActiveRef.current = true;
+      setIncomingChatOverlay(fromStorage);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isBootstrapping,
+    isLanguageBootstrapping,
+    canEnterMainApp,
+    isAppForeground,
+  ]);
+
+  /**
+   * MainActivity is `singleTask`, so when the service launches it while the
+   * app is already running we get `onNewIntent` (proxied via DeviceEventEmitter
+   * from `IncomingChatModule`). Pop the overlay live without remount.
+   */
+  useEffect(() => {
+    if (!canEnterMainApp) return;
+    const sub = subscribeIncomingChatIntent(params => {
+      fcmTrace(
+        'RootNavigator: native onNewIntent overlay → room=',
+        params.roomId,
+      );
+      void cancelIncomingChatNotifications();
+      void stopIncomingChatNative();
+      foregroundIncomingOverlayActiveRef.current = true;
+      setIncomingChatOverlay(params);
+    });
+    return () => sub?.remove();
+  }, [canEnterMainApp]);
 
   useEffect(() => {
     let active = true;
@@ -142,6 +241,30 @@ export function RootNavigator() {
     void Linking.openURL(url);
   };
 
+  const onIncomingOverlayAccept = useCallback(
+    (p: OrderStackParamList['IncomingChatRequest']) => {
+      foregroundIncomingOverlayActiveRef.current = false;
+      setIncomingChatOverlay(null);
+      void cancelIncomingChatNotifications();
+      void clearPendingIncomingChat();
+      void stopIncomingChatNative();
+      acceptIncomingChatFromPush(dispatch, p);
+    },
+    [dispatch],
+  );
+
+  const onIncomingOverlayReject = useCallback(
+    (p: OrderStackParamList['IncomingChatRequest']) => {
+      foregroundIncomingOverlayActiveRef.current = false;
+      setIncomingChatOverlay(null);
+      void cancelIncomingChatNotifications();
+      void clearPendingIncomingChat();
+      void stopIncomingChatNative();
+      rejectIncomingChatFromPush(dispatch, p);
+    },
+    [dispatch],
+  );
+
   useEffect(() => {
     if (!updateDecision || updateDecision.mode !== 'optional' || optionalPromptShown) {
       return;
@@ -163,11 +286,27 @@ export function RootNavigator() {
         fcmTrace(`FCM handler [${source}] empty remoteMessage`);
         return;
       }
+      const captured = captureFcmMessage(
+        source === 'onNotificationOpenedApp'
+          ? 'opened-from-tray'
+          : 'initial-notification',
+        remoteMessage,
+      );
       fcmTrace(
         `FCM handler [${source}] messageId=`,
         remoteMessage.messageId ?? '(none)',
+        'verdict=',
+        captured?.verdict ?? '(none)',
       );
-      handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
+      const overlayParams = handleIncomingChatNotificationOpen(
+        dispatch,
+        remoteMessage.data,
+        canEnterMainApp,
+      );
+      if (overlayParams) {
+        foregroundIncomingOverlayActiveRef.current = true;
+        setIncomingChatOverlay(overlayParams);
+      }
     };
 
     const unsubOpened = messaging().onNotificationOpenedApp(remoteMessage => {
@@ -175,9 +314,52 @@ export function RootNavigator() {
     });
 
     const unsubForeground = messaging().onMessage(remoteMessage => {
-      fcmTrace('FCM foreground onMessage → local notification + handle');
-      void showLocalNotificationFromRemoteMessage(remoteMessage);
-      onRemote(remoteMessage, 'onMessage');
+      const captured = captureFcmMessage('foreground', remoteMessage);
+      fcmTrace(
+        'FCM foreground onMessage → custom overlay / native fallback',
+        'verdict=',
+        captured?.verdict ?? '(none)',
+      );
+      void (async () => {
+        const inForegroundUi = canEnterMainApp && isAppForeground;
+        const overlayParams = inForegroundUi
+          ? handleIncomingChatNotificationOpen(
+              dispatch,
+              remoteMessage.data,
+              canEnterMainApp,
+            )
+          : null;
+
+        if (overlayParams) {
+          /**
+           * Foreground astrologer: skip the system notification entirely and
+           * pop the in-app overlay (it owns the ringtone + vibration loop).
+           */
+          foregroundIncomingOverlayActiveRef.current = true;
+          setIncomingChatOverlay(overlayParams);
+          return;
+        }
+
+        /**
+         * Background-while-RN-still-running OR cannot-enter-main-app yet:
+         * delegate to the native foreground service so the activity launches
+         * over the lock screen / current foreground app. Falls back to a
+         * Notifee heads-up notification on iOS / when the bridge is missing.
+         */
+        handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
+        const params = handleIncomingChatNotificationOpen(
+          dispatch,
+          remoteMessage.data,
+          canEnterMainApp,
+        );
+        let handledNatively = false;
+        if (params) {
+          handledNatively = await startIncomingChatNative(params);
+        }
+        if (!handledNatively) {
+          void showLocalNotificationFromRemoteMessage(remoteMessage);
+        }
+      })();
     });
 
     void messaging()
@@ -190,11 +372,103 @@ export function RootNavigator() {
       unsubOpened();
       unsubForeground();
     };
+  }, [
+    dispatch,
+    isBootstrapping,
+    isLanguageBootstrapping,
+    canEnterMainApp,
+    isAppForeground,
+  ]);
+
+  /**
+   * Local Notifee notifications (shown from `setBackgroundMessageHandler`) do not trigger
+   * Firebase `onNotificationOpenedApp`. Handle cold start + tap via Notifee APIs.
+   *
+   * Waits until the astrologer session is ready so `getInitialNotification` still delivers
+   * after OTP when the user opened the app from a killed state via the notification.
+   */
+  useEffect(() => {
+    if (isBootstrapping || isLanguageBootstrapping || !canEnterMainApp) {
+      return;
+    }
+
+    const tryOpenFromNotifeeNotification = (
+      n: { data?: Record<string, string | number | object> } | undefined | null,
+      source: string,
+    ) => {
+      if (!n?.data || typeof n.data !== 'object') {
+        return;
+      }
+      const flat = flattenNotificationData(
+        n.data as Record<string, string | number | boolean | object | undefined>,
+      );
+      if (Object.keys(flat).length === 0) {
+        return;
+      }
+      fcmTrace('Notifee handler [', source, '] keys=', Object.keys(flat).join(','));
+      const params = handleIncomingChatNotificationOpen(dispatch, flat, canEnterMainApp);
+      if (params) {
+        foregroundIncomingOverlayActiveRef.current = true;
+        setIncomingChatOverlay(params);
+      }
+    };
+
+    void notifee.getInitialNotification().then(initial => {
+      tryOpenFromNotifeeNotification(initial?.notification ?? null, 'notifee.getInitialNotification');
+    });
+
+    const unsub = notifee.onForegroundEvent(({ type, detail }) => {
+      const n = detail.notification;
+      if (type === EventType.ACTION_PRESS && n?.data) {
+        const actionId = detail.pressAction?.id;
+        if (
+          actionId === 'incoming_chat_accept' ||
+          actionId === 'incoming_chat_decline'
+        ) {
+          const flat = flattenNotificationData(
+            n.data as Record<string, string | number | boolean | object | undefined>,
+          );
+          const params = getIncomingChatParamsFromData(flat);
+          if (params && canEnterMainApp) {
+            foregroundIncomingOverlayActiveRef.current = false;
+            setIncomingChatOverlay(null);
+            if (actionId === 'incoming_chat_accept') {
+              acceptIncomingChatFromPush(dispatch, params);
+            } else {
+              rejectIncomingChatFromPush(dispatch, params);
+            }
+          }
+          return;
+        }
+      }
+      if (type === EventType.PRESS && n) {
+        tryOpenFromNotifeeNotification(n, 'notifee.onForegroundEvent');
+      }
+    });
+
+    return () => unsub();
   }, [dispatch, isBootstrapping, isLanguageBootstrapping, canEnterMainApp]);
 
   useEffect(() => {
     flushPendingWaitlistFcmNavigation(canEnterMainApp);
   }, [canEnterMainApp]);
+
+  useEffect(() => {
+    if (!canEnterMainApp && incomingChatOverlay) {
+      foregroundIncomingOverlayActiveRef.current = false;
+      setIncomingChatOverlay(null);
+    }
+  }, [canEnterMainApp, incomingChatOverlay]);
+
+  /**
+   * Whenever the in-app overlay is up, silence the system ringing
+   * notification so we don't ring twice (overlay owns the looping audio).
+   */
+  useEffect(() => {
+    if (incomingChatOverlay) {
+      void cancelIncomingChatNotifications();
+    }
+  }, [incomingChatOverlay]);
 
   if (isBootstrapping || isLanguageBootstrapping) {
     return <AppLoader />;
@@ -205,6 +479,13 @@ export function RootNavigator() {
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
       </NavigationContainer>
+
+      <IncomingChatPushOverlay
+        visible={Boolean(incomingChatOverlay)}
+        payload={incomingChatOverlay}
+        onAccept={onIncomingOverlayAccept}
+        onReject={onIncomingOverlayReject}
+      />
 
       {updateDecision?.mode === 'optional' && optionalPromptShown ? (
         <Modal transparent animationType="fade" visible>

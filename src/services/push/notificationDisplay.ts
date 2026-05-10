@@ -1,8 +1,29 @@
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, {
+  AndroidCategory,
+  AndroidImportance,
+  AndroidVisibility,
+  AuthorizationStatus,
+} from '@notifee/react-native';
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
+import { Platform } from 'react-native';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
+import { getIncomingChatParamsFromData } from './incomingChatFromFcm';
+import { setPendingIncomingChat } from './pendingIncomingChat';
 
 const DEFAULT_CHANNEL_ID = 'chat_requests';
+
+/**
+ * Bumped from `chat_incoming_ring` → `_v3` because Android caches channel sound at
+ * creation time. Existing installs keep the old (silent default) channel until we
+ * recreate it under a new id.
+ */
+const INCOMING_RING_CHANNEL_ID = 'chat_incoming_ring_v3';
+
+/** Must match `android/app/src/main/res/raw/incoming_chat_ring.wav` (no extension when referenced). */
+const INCOMING_RING_RES = 'incoming_chat_ring';
+
+/** Vibration: ring → pause → ring (mimics phone call cadence). */
+const RING_VIBRATION_PATTERN = [0, 1000, 800, 1000, 800, 1000, 800];
 
 function toText(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -20,12 +41,40 @@ async function ensureDefaultChannel(): Promise<string> {
   });
 }
 
+/**
+ * Incoming-chat (call-style) channel — uses our bundled `incoming_chat_ring` sound,
+ * loops, vibrates, lights up the screen, and is treated as a CALL category so it
+ * bypasses Do Not Disturb where allowed.
+ */
+async function ensureIncomingRingChannel(): Promise<string> {
+  return notifee.createChannel({
+    id: INCOMING_RING_CHANNEL_ID,
+    name: 'Incoming chat (ring)',
+    description: 'Ringtone for incoming chat requests',
+    importance: AndroidImportance.HIGH,
+    sound: INCOMING_RING_RES,
+    vibration: true,
+    vibrationPattern: RING_VIBRATION_PATTERN,
+    bypassDnd: true,
+    visibility: AndroidVisibility.PUBLIC,
+    lights: true,
+    lightColor: '#B77A72',
+  });
+}
+
 export async function initializeLocalNotifications(): Promise<void> {
   try {
     const settings = await notifee.requestPermission();
     fcmTrace('notifee.requestPermission →', JSON.stringify(settings));
-    const channelId = await ensureDefaultChannel();
-    fcmTrace('notification channel ready', channelId);
+    if (
+      Platform.OS === 'android' &&
+      settings.authorizationStatus !== AuthorizationStatus.AUTHORIZED
+    ) {
+      fcmTrace('notifee permission NOT granted — chat ring may stay silent.');
+    }
+    await ensureDefaultChannel();
+    await ensureIncomingRingChannel();
+    fcmTrace('notification channels ready');
   } catch (error) {
     fcmTraceError('initializeLocalNotifications failed', error);
   }
@@ -35,7 +84,7 @@ function getTitle(remoteMessage: FirebaseMessagingTypes.RemoteMessage): string {
   return (
     remoteMessage.notification?.title ||
     toText(remoteMessage.data?.title) ||
-    'Chat Request'
+    'Incoming Chat Request'
   );
 }
 
@@ -43,46 +92,133 @@ function getBody(remoteMessage: FirebaseMessagingTypes.RemoteMessage): string {
   return (
     remoteMessage.notification?.body ||
     toText(remoteMessage.data?.body) ||
-    'Received a new chat request.'
+    'A user is requesting a chat consultation'
   );
 }
 
-/** Shows a local notification for data-only FCM payloads. */
+/** Notifee requires serializable data on the notification for tap / initial-notification handling. */
+function buildNotifeeDataPayload(
+  remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+): Record<string, string> {
+  const data = remoteMessage.data ?? {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined || value === null) continue;
+    out[key] = typeof value === 'string' ? value : JSON.stringify(value);
+  }
+  return out;
+}
+
+/** Shows a local notification for data-only FCM payloads (background / killed). */
 export async function showLocalNotificationFromRemoteMessage(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
 ): Promise<void> {
   const title = getTitle(remoteMessage);
   const body = getBody(remoteMessage);
+  const incomingParams = getIncomingChatParamsFromData(remoteMessage.data);
+  const isIncomingChat = incomingParams !== null;
+
   fcmTrace(
     'showLocalNotification ← messageId=' +
       (remoteMessage.messageId ?? '(none)') +
       ' collapseKey=' +
       String(remoteMessage.collapseKey ?? ''),
-    'title=' +
-      JSON.stringify(title) +
-      ' body=' +
-      JSON.stringify(body.slice(0, 120)),
+    'title=' + JSON.stringify(title),
+    'incomingChat=' + String(isIncomingChat),
   );
-  fcmTrace(
-    'remoteMessage.data (keys)=',
-    remoteMessage.data ? Object.keys(remoteMessage.data).join(',') : '(none)',
-  );
+
+  /**
+   * For incoming chat, persist the parsed params NOW (before showing the
+   * notification). When Notifee's `fullScreenAction` later wakes the device
+   * and launches MainActivity, RootNavigator can read this and pop the
+   * IncomingChatPushOverlay automatically — even if the user never tapped
+   * the notification body.
+   */
+  if (isIncomingChat && incomingParams) {
+    await setPendingIncomingChat(incomingParams);
+  }
+
   try {
-    const channelId = await ensureDefaultChannel();
+    const channelId = isIncomingChat
+      ? await ensureIncomingRingChannel()
+      : await ensureDefaultChannel();
+
+    const dataPayload = buildNotifeeDataPayload(remoteMessage);
+
     await notifee.displayNotification({
       id: remoteMessage.messageId || undefined,
       title,
       body,
+      data: dataPayload,
       android: {
         channelId,
         smallIcon: 'ic_launcher',
         pressAction: {
           id: 'default',
+          launchActivity: 'default',
         },
+        ...(isIncomingChat
+          ? {
+              category: AndroidCategory.CALL,
+              visibility: AndroidVisibility.PUBLIC,
+              importance: AndroidImportance.HIGH,
+              sound: INCOMING_RING_RES,
+              loopSound: true,
+              ongoing: true,
+              autoCancel: false,
+              showTimestamp: true,
+              lights: ['#B77A72', 400, 600],
+              lightUpScreen: true,
+              vibrationPattern: RING_VIBRATION_PATTERN,
+              /**
+               * Locked-screen wake: Notifee opens MainActivity full-screen
+               * (manifest already sets `showWhenLocked` + `turnScreenOn`).
+               * Once JS boots, RootNavigator consumes the pending payload
+               * stored above and renders the custom Accept/Reject overlay.
+               */
+              fullScreenAction: {
+                id: 'default',
+                launchActivity: 'default',
+              },
+              actions: [
+                {
+                  title: 'Accept',
+                  pressAction: {
+                    id: 'incoming_chat_accept',
+                    launchActivity: 'default',
+                  },
+                },
+                {
+                  title: 'Reject',
+                  pressAction: { id: 'incoming_chat_decline' },
+                },
+              ],
+            }
+          : {}),
       },
+      ios: isIncomingChat
+        ? {
+            sound: 'default',
+            interruptionLevel: 'timeSensitive' as const,
+          }
+        : undefined,
     });
     fcmTrace('notifee.displayNotification OK channelId=', channelId);
   } catch (error) {
     fcmTraceError('showLocalNotificationFromRemoteMessage FAILED', error);
+  }
+}
+
+/** Cancel any active incoming-chat ringing notification (call this on accept/reject). */
+export async function cancelIncomingChatNotifications(): Promise<void> {
+  try {
+    const displayed = await notifee.getDisplayedNotifications();
+    await Promise.all(
+      displayed
+        .filter(d => d.notification.android?.channelId === INCOMING_RING_CHANNEL_ID)
+        .map(d => (d.id ? notifee.cancelNotification(d.id) : Promise.resolve())),
+    );
+  } catch (error) {
+    fcmTraceError('cancelIncomingChatNotifications failed', error);
   }
 }
