@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:device": "bash scripts/run-android-one-device.sh",
     "android:emulator": "bash scripts/run-android-with-emulator.sh",
     "android:create-phone": "bash scripts/create-phone-emulator.sh",
     "ios": "react-native run-ios",
@@ -30,6 +31,7 @@
     "react-native": "0.84.0",
     "react-native-audio-recorder-player": "3.6.14",
     "react-native-blob-util": "^0.24.7",
+    "react-native-callkeep": "^4.3.16",
     "react-native-device-info": "^15.0.2",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-gifted-charts": "^1.4.74",
