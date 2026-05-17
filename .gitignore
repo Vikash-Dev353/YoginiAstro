@@ -1,37 +1,6 @@
 node_modules
-
-# macOS
+.yarn/cache/
+.tmp-patch/
 .DS_Store
-
-# Env / secrets
-.env
-.env.*
-!.env.example
-
-# Metro / RN
-.expo/
-dist/
-
-# Android
 android/build/
-android/app/build/
-android/app/.cxx/
-android/.gradle/
-android/.gradle.bak.*/
-android/local.properties
-*.apk
-*.aab
-*.keystore
-!debug.keystore
-
-# iOS
-ios/build/
 ios/Pods/
-ios/*.xcworkspace/xcuserdata/
-ios/*.xcodeproj/xcuserdata/
-ios/*.xcodeproj/project.xcworkspace/xcuserdata/
-DerivedData/
-
-# Logs / caches
-*.log
-.npm/
