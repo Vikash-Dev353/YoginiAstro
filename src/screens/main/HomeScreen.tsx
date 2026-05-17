@@ -325,21 +325,21 @@ function HomeScreenComponent({ navigation }: Props) {
           <TouchableOpacity onPress={openSupport}>
             <Image
               source={images.streamlineCustomerSupport}
-              style={styles.headerIconImage}
+              style={styles.headerRetinaIcon}
               resizeMode="contain"
             />
           </TouchableOpacity>
           <TouchableOpacity onPress={openLanguageModal}>
             <Image
               source={images.uilLanguage}
-              style={styles.headerIconImage}
+              style={styles.headerRetinaIcon}
               resizeMode="contain"
             />
           </TouchableOpacity>
           <TouchableOpacity>
             <Image
               source={images.cuidaNotificationBellOutline}
-              style={styles.headerIconImage}
+              style={styles.headerRetinaIcon}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -401,7 +401,7 @@ function HomeScreenComponent({ navigation }: Props) {
             <Pressable style={styles.arrowButton}>
               
               <Image
-                source={images.chevronRight}
+                source={images.makiArrow}
                 style={styles.arrowImage}
                 resizeMode="contain"
               />
@@ -680,9 +680,9 @@ const styles = StyleSheet.create({
     height: 26,
     tintColor: "#6D3F3F",
   },
-  headerIconImage: {
-    width: 26,
-    height: 26,
+  headerRetinaIcon: {
+    width: 21,
+    height: 21,
     tintColor: "#ffffff",
   },
   gridLabel: {
