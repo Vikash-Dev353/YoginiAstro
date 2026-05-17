@@ -26,9 +26,35 @@ export type SendOtpPayload = {
 };
 
 export type SendOtpResponse = {
-  message: string;
-  status: 'Success' | 'Failed' | string;
+  message?: string;
+  status?: 'Success' | 'Failed' | string;
+  isNewAstrologer?: boolean;
+  data?: {
+    message?: string;
+    status?: string;
+    isNewAstrologer?: boolean;
+  };
 };
+
+export type NormalizedSendOtpResponse = {
+  message: string;
+  status: string;
+  isNewAstrologer: boolean;
+};
+
+/** API wraps send-otp payload in `{ data: { status, message, isNewAstrologer } }`. */
+export function normalizeSendOtpResponse(
+  raw: SendOtpResponse,
+): NormalizedSendOtpResponse {
+  const nested = raw.data;
+  return {
+    message: (nested?.message ?? raw.message ?? '').trim(),
+    status: (nested?.status ?? raw.status ?? '').trim(),
+    isNewAstrologer: Boolean(
+      nested?.isNewAstrologer ?? raw.isNewAstrologer,
+    ),
+  };
+}
 
 export type VerifyOtpPayload = {
   mobile: string;

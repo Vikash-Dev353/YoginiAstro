@@ -961,7 +961,9 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
               inputContainerStyle={[styles.inputBox, styles.multilineInput]}
             />
 
-            <Text style={styles.label}>
+            <Text style={[styles.label,{
+              marginTop: hp(4),
+            }]}>
               {t('completeProfile.speciality')}
               <Text style={styles.req}>*</Text>
             </Text>
@@ -1060,7 +1062,9 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
               <Text style={styles.chevron}>▼</Text>
             </Pressable>
 
-            <Text style={styles.label}>
+            <Text style={[styles.label,{
+              marginTop: hp(1),
+            }]}>
               {t('completeProfile.city')}
               <Text style={styles.req}>*</Text>
             </Text>
@@ -1358,8 +1362,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    marginBottom: 14,
+    marginBottom: 1,
     alignItems: 'flex-start',
+    marginTop: hp(2),
   },
   half: {
     flex: 1,

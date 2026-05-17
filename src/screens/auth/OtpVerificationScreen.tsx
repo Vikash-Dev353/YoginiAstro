@@ -53,7 +53,8 @@ function normalizeVerifyOtpResponse(raw: unknown): VerifyOtpResponse {
 }
 
 function OtpVerificationScreenComponent({ route, navigation }: Props) {
-  const { mobile, flow = "login" } = route.params;
+  const { mobile, flow = "login", isNewAstrologer = false } = route.params;
+  const needsCompleteProfile = flow === "register" || isNewAstrologer;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -143,7 +144,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
 
     try {
       const verifyAction =
-        flow === "register"
+        needsCompleteProfile && !isNewAstrologer
           ? verifyRegisterOtp({ mobile, otp: otpValue })
           : verifyOtp({ mobile, otp: otpValue });
       const response = await dispatch(verifyAction).unwrap();
@@ -168,7 +169,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
         decodeAstroIdFromToken(token);
       await storage.setAuthToken(token);
 
-      if (flow === "register") {
+      if (needsCompleteProfile) {
         dispatch(
           setAuthenticatedSession({
             token,
@@ -179,13 +180,13 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
               email: normalized.user?.email || `${mobile}@yoginiastro.com`,
             },
             pendingProfileCompletion: true,
-            pendingAdminApproval: true,
+            pendingAdminApproval: false,
           })
         );
         await dispatch(
           applyAuthGate({
             pendingProfileCompletion: true,
-            pendingAdminApproval: true,
+            pendingAdminApproval: false,
           })
         ).unwrap();
         navigation.replace("CompleteProfile");
@@ -209,8 +210,8 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
         ).unwrap();
       }
 
-      /** Register flow does not open main app yet — attach here. Login flow uses RootNavigator. */
-      if (flow === "register") {
+      /** Profile completion flow does not open main app yet — attach here. */
+      if (needsCompleteProfile) {
         const attachAstroId = resolvedAstroId || decodeAstroIdFromToken(token) || "";
         if (attachAstroId) {
           void attachDeviceToUser({ authToken: token, astroId: attachAstroId });
@@ -225,7 +226,15 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
       );
       setLoading(false);
     }
-  }, [dispatch, flow, mobile, navigation, otpValue, t]);
+  }, [
+    dispatch,
+    isNewAstrologer,
+    mobile,
+    navigation,
+    needsCompleteProfile,
+    otpValue,
+    t,
+  ]);
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");

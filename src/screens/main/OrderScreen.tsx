@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -14,9 +15,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "../../assets/images";
 import { AppGifLoader } from "../../components/common/AppGifLoader";
 import { AppHeader } from "../../components/common/AppHeader";
+import { ComingSoonContent } from "../../components/common/ComingSoonContent";
+import { NoDataFound } from "../../components/common/NoDataFound";
 import { colors } from "../../constants/colors";
 import { useTranslation } from "../../localization/useTranslation";
-import { OrderStackParamList } from "../../navigation/types";
+import { OrderStackParamList, RootTabParamList } from "../../navigation/types";
 import {
   astroApi,
   type CallHistoryItem,
@@ -33,7 +36,7 @@ import {
   setAstroChatData,
   setSocketChatDisconnect,
 } from "../../store/slices/socketSlice";
-import { normalizeFont, wp } from "../../utils/responsive";
+import { hp, normalizeFont, wp } from "../../utils/responsive";
 
 type OrderTab = "Waitlist" | "Voice Call" | "Chat" | "Pooja Booking";
 
@@ -209,6 +212,12 @@ export function OrderScreen({ route, navigation }: Props) {
   const [rejectedRequestIds, setRejectedRequestIds] = useState<string[]>([]);
   const [orderFocusKey, setOrderFocusKey] = useState(0);
   const socketChatRequests = useAppSelector(selectChatRequests);
+
+  const onBackToHome = useCallback(() => {
+    navigation
+      .getParent<BottomTabNavigationProp<RootTabParamList>>()
+      ?.navigate("Home", { screen: "HomeMain" });
+  }, [navigation]);
 
   useEffect(() => {
     if (route.params?.initialTab) {
@@ -664,14 +673,17 @@ export function OrderScreen({ route, navigation }: Props) {
         })}
       </View>
 
+      {activeTab === "Pooja Booking" ? (
+        <ComingSoonContent onBackToHome={onBackToHome} />
+      ) : (
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={
           activeTab === "Waitlist" ? (
-            <View style={styles.emptyState}>
-              {isWaitlistLoading ? (
+            isWaitlistLoading ? (
+              <View style={styles.emptyLoaderWrap}>
                 <AppGifLoader
                   message={
                     appLanguage === "hi"
@@ -680,18 +692,16 @@ export function OrderScreen({ route, navigation }: Props) {
                   }
                   size={100}
                 />
-              ) : (
-                <Text style={styles.emptyStateText}>
-                  {waitlistError ||
-                    (appLanguage === "hi"
-                      ? "अभी कोई वेटलिस्ट रिक्वेस्ट नहीं है।"
-                      : "No waitlist requests found.")}
-                </Text>
-              )}
-            </View>
+              </View>
+            ) : (
+              <NoDataFound
+                message={waitlistError ?? t("order.noWaitlist")}
+                style={styles.emptyList}
+              />
+            )
           ) : activeTab === "Chat" ? (
-            <View style={styles.emptyState}>
-              {isConsultationsLoading ? (
+            isConsultationsLoading ? (
+              <View style={styles.emptyLoaderWrap}>
                 <AppGifLoader
                   message={
                     appLanguage === "hi"
@@ -700,18 +710,16 @@ export function OrderScreen({ route, navigation }: Props) {
                   }
                   size={100}
                 />
-              ) : (
-                <Text style={styles.emptyStateText}>
-                  {consultationsError ||
-                    (appLanguage === "hi"
-                      ? "अभी कोई रिसेंट कंसल्टेशन नहीं है।"
-                      : "No recent consultations.")}
-                </Text>
-              )}
-            </View>
+              </View>
+            ) : (
+              <NoDataFound
+                message={consultationsError ?? t("order.noChat")}
+                style={styles.emptyList}
+              />
+            )
           ) : activeTab === "Voice Call" ? (
-            <View style={styles.emptyState}>
-              {isCallHistoryLoading ? (
+            isCallHistoryLoading ? (
+              <View style={styles.emptyLoaderWrap}>
                 <AppGifLoader
                   message={
                     appLanguage === "hi"
@@ -720,20 +728,22 @@ export function OrderScreen({ route, navigation }: Props) {
                   }
                   size={100}
                 />
-              ) : (
-                <Text style={styles.emptyStateText}>
-                  {callHistoryError ||
-                    (appLanguage === "hi"
-                      ? "अभी कोई कॉल इतिहास नहीं है।"
-                      : "No call history found.")}
-                </Text>
-              )}
-            </View>
+              </View>
+            ) : (
+              <NoDataFound
+                message={callHistoryError ?? t("order.noCallHistory")}
+                style={styles.emptyList}
+              />
+            )
           ) : null
         }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          data.length === 0 && styles.listContentEmpty,
+        ]}
         showsVerticalScrollIndicator={false}
       />
+      )}
     </SafeAreaView>
   );
 }
@@ -777,6 +787,21 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 120,
     gap: 12,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyLoaderWrap: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(6),
+  },
+  emptyList: {
+    flexGrow: 1,
+    minHeight: hp(40),
+    // minHeight:hp
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -972,19 +997,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: normalizeFont(16 / 1.1),
     fontWeight: "700",
-  },
-  emptyState: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: "#DFCFCF",
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    backgroundColor: "#FFFFFF",
-  },
-  emptyStateText: {
-    color: "#6E5C5C",
-    fontSize: normalizeFont(14),
-    textAlign: "center",
   },
 });

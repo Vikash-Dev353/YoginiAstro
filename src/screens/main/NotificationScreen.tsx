@@ -1,17 +1,21 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
+import { NoDataFound } from '../../components/common/NoDataFound';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
 
 export function NotificationScreen() {
   const { t } = useTranslation();
+  const notifications: unknown[] = [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <AppHeader title={t('common.notification')} />
       <View style={styles.content}>
-        <Text style={styles.title}>{t('common.notification')}</Text>
+        {notifications.length === 0 ? (
+          <NoDataFound message={t('notification.empty')} />
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -26,10 +30,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '600',
   },
 });

@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useMemo } from 'react';
 import { registerDeviceWithNotificationPermission } from '../services/device/registerDevice';
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { SignupScreen } from '../screens/auth/SignupScreen';
 import { OtpVerificationScreen } from '../screens/auth/OtpVerificationScreen';
 import { PendingApprovalScreen } from '../screens/auth/PendingApprovalScreen';
 import { PrivacyPolicyScreen } from '../screens/auth/PrivacyPolicyScreen';
@@ -42,7 +43,7 @@ export function AuthNavigator() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
-      <Stack.Screen name="Signup" component={LoginScreen} />
+      <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
       <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} />
       <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />

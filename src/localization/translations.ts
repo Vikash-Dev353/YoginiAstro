@@ -24,6 +24,7 @@ export const translations = {
       paid: 'Paid',
       reject: 'Reject',
       accept: 'Accept',
+      noDataFound: 'No Data Found',
     },
     languageModal: {
       title: 'Change App Language',
@@ -41,6 +42,11 @@ export const translations = {
       waitlist: 'Waitlist',
       support: 'Support',
       myReviews: 'My Reviews',
+    },
+    comingSoon: {
+      titleLine1: 'Coming',
+      titleLine2: 'Soon',
+      backToHome: 'Back To Home',
     },
     support: {
       headline: "We're here to help 24/7",
@@ -85,9 +91,19 @@ export const translations = {
     profile: {
       astrologerProfile: 'Astrologer Profile',
       clearDataLogout: 'Clear Data & Logout',
-      paySlip: 'Pay Slip',
+      paySlip: 'Monthly Payout',
       downloadForm: 'Download Form 16A',
       termConditions: 'Term & Conditions',
+    },
+    monthlyPayout: {
+      paid: 'Paid',
+      pending: 'Pending',
+      download: 'Download payout',
+      loading: 'Loading payouts...',
+      empty: 'No monthly payouts found.',
+      downloadUnavailableTitle: 'Download unavailable',
+      downloadUnavailable: 'Payout document is not available yet.',
+      downloadFailed: 'Unable to open the download link.',
     },
     completeProfile: {
       headline: 'Complete your details to register as an astrologer',
@@ -136,8 +152,14 @@ export const translations = {
       typeMessage: 'Type a message',
       end: 'End',
     },
+    notification: {
+      empty: 'No notifications at the moment.',
+    },
     order: {
       waitlist: 'Waitlist',
+      noWaitlist: 'No waitlist requests at the moment.',
+      noChat: 'No recent consultations.',
+      noCallHistory: 'No call history found.',
       voiceCall: 'Voice Call',
       chat: 'Chat',
       poojaBooking: 'Pooja Booking',
@@ -180,6 +202,7 @@ export const translations = {
       paid: 'भुगतान हुआ',
       reject: 'अस्वीकार',
       accept: 'स्वीकार',
+      noDataFound: 'कोई डेटा नहीं मिला',
     },
     languageModal: {
       title: 'ऐप भाषा बदलें',
@@ -197,6 +220,11 @@ export const translations = {
       waitlist: 'वेटलिस्ट',
       support: 'सहायता',
       myReviews: 'मेरे रिव्यू',
+    },
+    comingSoon: {
+      titleLine1: 'जल्द',
+      titleLine2: 'आ रहा है',
+      backToHome: 'होम पर वापस जाएं',
     },
     support: {
       headline: 'हम 24/7 मदद के लिए यहाँ हैं',
@@ -241,9 +269,19 @@ export const translations = {
     profile: {
       astrologerProfile: 'ज्योतिष प्रोफाइल',
       clearDataLogout: 'डेटा साफ करें और लॉगआउट',
-      paySlip: 'पे स्लिप',
+      paySlip: 'मासिक भुगतान',
       downloadForm: 'फॉर्म 16A डाउनलोड करें',
       termConditions: 'नियम और शर्तें',
+    },
+    monthlyPayout: {
+      paid: 'भुगतान हुआ',
+      pending: 'लंबित',
+      download: 'भुगतान डाउनलोड करें',
+      loading: 'भुगतान लोड हो रहा है...',
+      empty: 'कोई मासिक भुगतान नहीं मिला।',
+      downloadUnavailableTitle: 'डाउनलोड उपलब्ध नहीं',
+      downloadUnavailable: 'भुगतान दस्तावेज़ अभी उपलब्ध नहीं है।',
+      downloadFailed: 'डाउनलोड लिंक नहीं खुल सका।',
     },
     completeProfile: {
       headline: 'ज्योतिषी के रूप में पंजीकरण के लिए अपनी जानकारी पूरी करें',
@@ -292,8 +330,14 @@ export const translations = {
       typeMessage: 'संदेश लिखें',
       end: 'समाप्त',
     },
+    notification: {
+      empty: 'अभी कोई सूचना नहीं है।',
+    },
     order: {
       waitlist: 'वेटलिस्ट',
+      noWaitlist: 'अभी कोई वेटलिस्ट रिक्वेस्ट नहीं है।',
+      noChat: 'अभी कोई रिसेंट कंसल्टेशन नहीं है।',
+      noCallHistory: 'अभी कोई कॉल इतिहास नहीं है।',
       voiceCall: 'वॉइस कॉल',
       chat: 'चैट',
       poojaBooking: 'पूजा बुकिंग',
@@ -337,6 +381,7 @@ export type TranslationKey =
   | 'common.paid'
   | 'common.reject'
   | 'common.accept'
+  | 'common.noDataFound'
   | 'languageModal.title'
   | 'languageModal.english'
   | 'languageModal.hindi'
@@ -390,6 +435,14 @@ export type TranslationKey =
   | 'profile.paySlip'
   | 'profile.downloadForm'
   | 'profile.termConditions'
+  | 'monthlyPayout.paid'
+  | 'monthlyPayout.pending'
+  | 'monthlyPayout.download'
+  | 'monthlyPayout.loading'
+  | 'monthlyPayout.empty'
+  | 'monthlyPayout.downloadUnavailableTitle'
+  | 'monthlyPayout.downloadUnavailable'
+  | 'monthlyPayout.downloadFailed'
   | 'completeProfile.headline'
   | 'completeProfile.uploadPhoto'
   | 'completeProfile.fullName'
@@ -431,7 +484,11 @@ export type TranslationKey =
   | 'reviewScreen.guestUser'
   | 'chat.typeMessage'
   | 'chat.end'
+  | 'notification.empty'
   | 'order.waitlist'
+  | 'order.noWaitlist'
+  | 'order.noChat'
+  | 'order.noCallHistory'
   | 'order.voiceCall'
   | 'order.chat'
   | 'order.poojaBooking'

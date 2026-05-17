@@ -1,5 +1,8 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { authApi } from '../../services/api/authApi';
+import {
+  authApi,
+  normalizeSendOtpResponse,
+} from '../../services/api/authApi';
 import { setAccessToken } from '../../services/api/client';
 import { type AuthGateSnapshot, storage } from '../../utils/storage';
 
@@ -153,7 +156,7 @@ export const sendOtp = createAsyncThunk(
   async (payload: { mobile: string }, { rejectWithValue }) => {
     try {
       const response = await authApi.sendOtp(payload);
-      return response;
+      return normalizeSendOtpResponse(response);
     } catch (error) {
       const errorMessage =
         (error as { message?: string })?.message ||
@@ -168,7 +171,7 @@ export const sendRegisterOtp = createAsyncThunk(
   async (payload: { mobile: string }, { rejectWithValue }) => {
     try {
       const response = await authApi.sendOtp(payload);
-      return response;
+      return normalizeSendOtpResponse(response);
     } catch (error) {
       const errorMessage =
         (error as { message?: string })?.message ||

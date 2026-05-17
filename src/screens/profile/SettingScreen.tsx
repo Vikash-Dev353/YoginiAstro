@@ -25,7 +25,7 @@ export function SettingScreen({ navigation, route }: Props) {
   const footerBottom = effectiveTabBarHeight + insets.bottom + 8;
   const footerEstimatedHeight = 56;
   const settingItems = [
-    { key: 'pay-slip', title: t('profile.paySlip'), iconLabel: 'PS' },
+    { key: 'pay-slip', title: t('profile.paySlip'), iconLabel: 'MP' },
     { key: 'download-form', title: t('profile.downloadForm'), iconLabel: 'D' },
     { key: 'tnc', title: t('profile.termConditions'), iconLabel: 'TC' },
     { key: 'privacy', title: t('auth.privacyPolicy'), iconLabel: 'PP' },
@@ -38,6 +38,14 @@ export function SettingScreen({ navigation, route }: Props) {
     }
     if (key === 'privacy') {
       navigation.navigate('PrivacyPolicy');
+      return;
+    }
+    if (key === 'pay-slip') {
+      navigation.navigate('MonthlyPayout');
+      return;
+    }
+    if (key === 'download-form') {
+      navigation.navigate('ComingSoon', { feature: 'form16a' });
       return;
     }
     Alert.alert(

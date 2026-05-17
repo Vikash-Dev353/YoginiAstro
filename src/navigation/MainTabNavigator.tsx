@@ -75,12 +75,35 @@ const CustomTabBar = memo(
       return null;
     }
 
-    const tabMeta: Record<keyof RootTabParamList, { label: string; icon: number }> = {
-      Home: { label: t('common.home'), icon: images.tabHome },
-      Order: { label: t('common.order'), icon: images.tabOrder },
-      Wallet: { label: t('common.wallet'), icon: images.tabWallet },
-      Notification: { label: t('common.notification'), icon: images.tabNotification },
-      Profile: { label: t('common.profile'), icon: images.tabProfile },
+    const tabMeta: Record<
+      keyof RootTabParamList,
+      { label: string; icon: number; activeIcon?: number }
+    > = {
+      Home: {
+        label: t('common.home'),
+        icon: images.tabHome,
+        activeIcon: images.tabHomeActive,
+      },
+      Order: {
+        label: t('common.order'),
+        icon: images.tabOrder,
+        activeIcon: images.tabOrderActive,
+      },
+      Wallet: {
+        label: t('common.wallet'),
+        icon: images.tabWallet,
+        activeIcon: images.tabWalletActive,
+      },
+      Notification: {
+        label: t('common.notification'),
+        icon: images.tabNotification,
+        activeIcon: images.tabNotificationActive,
+      },
+      Profile: {
+        label: t('common.profile'),
+        icon: images.tabProfile,
+        activeIcon: images.iconamoonProfileCircleFill,
+      },
     };
 
     return (
@@ -88,7 +111,8 @@ const CustomTabBar = memo(
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const routeName = route.name as keyof RootTabParamList;
-          const { label, icon } = tabMeta[routeName];
+          const { label, icon, activeIcon } = tabMeta[routeName];
+          const iconSource = isFocused && activeIcon ? activeIcon : icon;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -127,7 +151,7 @@ const CustomTabBar = memo(
               style={styles.tabItem}
             >
               <Image
-                source={icon}
+                source={iconSource}
                 style={[styles.iconImage, isFocused && styles.iconImageFocused]}
                 resizeMode="contain"
               />

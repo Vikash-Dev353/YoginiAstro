@@ -55,7 +55,11 @@ function SignupScreenComponent({ navigation }: Props) {
     try {
       const response = await dispatch(sendOtp({ mobile })).unwrap();
       if (response.status?.toLowerCase() === 'success') {
-        navigation.navigate('OtpVerification', { mobile, flow: 'register' });
+        navigation.navigate('OtpVerification', {
+          mobile,
+          flow: 'register',
+          isNewAstrologer: response.isNewAstrologer,
+        });
         return;
       }
       setLocalError(

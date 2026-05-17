@@ -10,6 +10,8 @@ export type AuthStackParamList = {
     mobile: string;
     /** Register/login both use same send-otp endpoint; flow only affects verify step. */
     flow?: 'login' | 'register';
+    /** From send-otp when account was just created — after verify, open Complete Profile. */
+    isNewAstrologer?: boolean;
   };
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;
@@ -51,8 +53,12 @@ export type ProfileStackParamList = {
   ProfileHome: undefined;
   CustomerSupport: undefined;
   GoLiveNow: undefined;
+  ComingSoon:
+    | { showHeader?: boolean; feature?: 'goLive' | 'form16a' }
+    | undefined;
   Review: undefined;
   Setting: { fromHomeScreen?: boolean } | undefined;
+  MonthlyPayout: undefined;
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;
 };
@@ -60,6 +66,9 @@ export type ProfileStackParamList = {
 export type HomeStackParamList = {
   HomeMain: undefined;
   Support: undefined;
+  ComingSoon:
+    | { showHeader?: boolean; feature?: 'goLive' | 'form16a' }
+    | undefined;
 };
 
 export type RootTabParamList = {

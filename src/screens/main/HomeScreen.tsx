@@ -294,6 +294,11 @@ function HomeScreenComponent({ navigation }: Props) {
       navigation.navigate("Support");
       return;
     }
+
+    if (key === "go-live") {
+      navigation.navigate("ComingSoon", { showHeader: false });
+      return;
+    }
   };
 
   const openSupport = () => {
