@@ -5,8 +5,20 @@ import { store } from './src/store';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { images } from './src/assets/images';
 import { IncomingChatDebugPanel } from './src/components/dev/IncomingChatDebugPanel';
+import { useEffect } from 'react';
+import { getMessaging } from '@react-native-firebase/messaging';
 
 function App() {
+
+  useEffect(() => {
+    console.log('App mounted');
+    const getToken = async () => {
+      let token = await getMessaging().getToken();
+      console.log('token', token);
+      // setAccessToken(token);
+    }
+    getToken();
+  }, []);
   return (
     <Provider store={store}>
       <SafeAreaProvider>

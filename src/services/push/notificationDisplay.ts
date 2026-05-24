@@ -10,7 +10,11 @@ import { fcmTrace, fcmTraceError } from './fcmDebug';
 import { getIncomingChatParamsFromData } from './incomingChatFromFcm';
 import { setPendingIncomingChat } from './pendingIncomingChat';
 
-const DEFAULT_CHANNEL_ID = 'chat_requests';
+/** Matches native `NotificationChannels.SOUND_CHANNEL_ID` + FCM `channel_id: sound_channel`. */
+const DEFAULT_CHANNEL_ID = 'sound_channel';
+
+/** Must match `android/app/src/main/res/raw/custom_sound.mp3` (no extension when referenced). */
+const CUSTOM_SOUND_RES = 'custom_sound';
 
 /**
  * Bumped from `chat_incoming_ring` → `_v3` because Android caches channel sound at
@@ -36,8 +40,11 @@ function toText(value: unknown): string {
 async function ensureDefaultChannel(): Promise<string> {
   return notifee.createChannel({
     id: DEFAULT_CHANNEL_ID,
-    name: 'Chat Requests',
+    name: 'Push notifications',
+    description: 'Default push notification sound',
     importance: AndroidImportance.HIGH,
+    sound: CUSTOM_SOUND_RES,
+    vibration: true,
   });
 }
 

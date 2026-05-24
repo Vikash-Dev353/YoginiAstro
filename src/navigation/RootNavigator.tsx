@@ -47,6 +47,7 @@ import {
 } from '../services/push/incomingChatAcceptFlow';
 import {
   clearPendingIncomingChat,
+  setPendingIncomingChat,
   takePendingIncomingChat,
 } from '../services/push/pendingIncomingChat';
 import {
@@ -354,6 +355,7 @@ export function RootNavigator() {
         );
         let handledNatively = false;
         if (params) {
+          await setPendingIncomingChat(params);
           handledNatively = await startIncomingChatNative(params);
         }
         if (!handledNatively) {

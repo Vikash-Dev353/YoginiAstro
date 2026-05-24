@@ -27,7 +27,10 @@ import {
   cancelIncomingChatNotifications,
   showLocalNotificationFromRemoteMessage,
 } from './src/services/push/notificationDisplay';
-import { clearPendingIncomingChat } from './src/services/push/pendingIncomingChat';
+import {
+  clearPendingIncomingChat,
+  setPendingIncomingChat,
+} from './src/services/push/pendingIncomingChat';
 import {
   startIncomingChatNative,
   stopIncomingChatNative,
@@ -37,6 +40,17 @@ import {
 notifee.onBackgroundEvent(async ({ type, detail }) => {
   fcmTrace('notifee.onBackgroundEvent type=', type, 'pressActionId=',
     detail?.pressAction?.id ?? '');
+
+  if (type === EventType.PRESS && detail.notification?.data) {
+    const flat = flattenNotificationData(detail.notification.data);
+    const params = getIncomingChatParamsFromData(flat);
+    if (params) {
+      await setPendingIncomingChat(params);
+      fcmTrace('notifee BG PRESS stored pending room=', params.roomId);
+    }
+    return;
+  }
+
   if (type !== EventType.ACTION_PRESS || !detail.notification?.data) {
     return;
   }
@@ -119,6 +133,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   );
   let handledNatively = false;
   if (Platform.OS === 'android' && params) {
+    await setPendingIncomingChat(params);
     /**
      * Backend currently sends a `notification` field which makes Android
      * auto-display its own banner before our handler runs. Cancel anything
@@ -135,8 +150,14 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     fcmTrace('BG handler native handled? ', handledNatively);
   }
   if (!handledNatively) {
-    fcmTrace('BG handler → falling back to Notifee notification');
-    await showLocalNotificationFromRemoteMessage(remoteMessage);
+    if (remoteMessage?.notification) {
+      fcmTrace(
+        'BG handler skipping Notifee — FCM already displayed notification (uses sound_channel)',
+      );
+    } else {
+      fcmTrace('BG handler → falling back to Notifee notification');
+      await showLocalNotificationFromRemoteMessage(remoteMessage);
+    }
   }
 });
 
