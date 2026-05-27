@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="incoming_bg">#3D1815</color>
+    <color name="incoming_title">#FFFFFF</color>
+    <color name="incoming_body">#E8D4D2</color>
+    <color name="incoming_accept">#1B6B28</color>
+    <color name="incoming_reject">#A02420</color>
+    <color name="incoming_brand">#F5D0CC</color>
+</resources>

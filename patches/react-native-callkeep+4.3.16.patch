@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java b/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
+index 025480a..2f20027 100644
+--- a/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
++++ b/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
+@@ -434,11 +434,7 @@ public class RNCallKeepModule extends ReactContextBaseJavaModule implements Life
+         this.hasListeners = false;
+     }
+ 
+-    @ReactMethod
+-    public void displayIncomingCall(String uuid, String number, String callerName) {
+-        this.displayIncomingCall(uuid, number, callerName, false, null);
+-    }
+-
++    // TurboModules: only one @ReactMethod per JS name (Java overloads collide).
+     @ReactMethod
+     public void displayIncomingCall(String uuid, String number, String callerName, boolean hasVideo) {
+         this.displayIncomingCall(uuid, number, callerName, hasVideo, null);
+@@ -483,11 +479,7 @@ public class RNCallKeepModule extends ReactContextBaseJavaModule implements Life
+         conn.onAnswer();
+     }
+ 
+-    @ReactMethod
+-    public void startCall(String uuid, String number, String callerName) {
+-        this.startCall(uuid, number, callerName, false, null);
+-    }
+-
++    // TurboModules: only one @ReactMethod per JS name (Java overloads collide).
+     @ReactMethod
+     public void startCall(String uuid, String number, String callerName, boolean hasVideo) {
+         this.startCall(uuid, number, callerName, hasVideo, null);

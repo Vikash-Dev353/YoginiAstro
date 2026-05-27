@@ -27,6 +27,10 @@ export type OrderStackParamList = {
     from?: string;
     customerName: string;
     customerImage?: string | null;
+    /** FCM / Notifee notification title (shown on custom incoming screen). */
+    notificationTitle?: string;
+    /** FCM / Notifee notification body (shown on custom incoming screen). */
+    notificationBody?: string;
     message?: string;
     /** Line under name, e.g. “Yoginiastro User” */
     subtitle?: string;

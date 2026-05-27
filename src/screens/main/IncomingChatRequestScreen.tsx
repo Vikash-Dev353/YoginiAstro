@@ -25,6 +25,8 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
     from,
     customerName,
     customerImage,
+    notificationTitle,
+    notificationBody,
     message,
     subtitle,
     kundliUrl,
@@ -32,6 +34,14 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
     userBalance,
     astroPrice,
   } = route.params;
+
+  const displayTitle =
+    notificationTitle?.trim() || customerName?.trim() || 'Incoming chat request';
+  const displayBody =
+    notificationBody?.trim() ||
+    message?.trim() ||
+    subtitle?.trim() ||
+    'Wants to chat with you.';
 
   useEffect(() => {
     if (!isAlerting) return;
@@ -101,12 +111,16 @@ export function IncomingChatRequestScreen({ navigation, route }: Props) {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centerWrap}>
           <Image source={avatarSource} style={styles.avatar} resizeMode="cover" />
-          <Text style={styles.name}>{customerName}</Text>
-          <Text style={styles.subtitle}>
-            {subtitle?.trim() || "Yoginiastro User"}
-          </Text>
-          <Text style={styles.message} numberOfLines={2}>
-            {message?.trim() || "Wants to chat with you."}
+          <Text style={styles.name}>{displayTitle}</Text>
+          {customerName.trim() !== displayTitle ? (
+            <Text style={styles.subtitle}>{customerName}</Text>
+          ) : (
+            <Text style={styles.subtitle}>
+              {subtitle?.trim() || 'Yoginiastro User'}
+            </Text>
+          )}
+          <Text style={styles.message} numberOfLines={3}>
+            {displayBody}
           </Text>
         </View>
 

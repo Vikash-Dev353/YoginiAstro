@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -14,10 +15,15 @@ import { AppGifLoader } from '../../components/common/AppGifLoader';
 import { AppHeader } from '../../components/common/AppHeader';
 import { DownloadIcon } from '../../components/common/DownloadIcon';
 import { colors } from '../../constants/colors';
-import { MOCK_MONTHLY_PAYOUTS } from '../../data/mockMonthlyPayouts';
 import { useTranslation } from '../../localization/useTranslation';
 import { ProfileStackParamList } from '../../navigation/types';
+import { astroApi } from '../../services/api/astroApi';
+import { useAppSelector } from '../../store/hooks';
 import type { MonthlyPayoutItem } from '../../types/monthlyPayout';
+import {
+  extractMonthlyReportDownloadUrl,
+  mapMonthlyReportsResponse,
+} from '../../utils/monthlyPayoutMapper';
 import { hp, normalizeFont, wp } from '../../utils/responsive';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'MonthlyPayout'>;
@@ -30,8 +36,14 @@ const formatAmount = (amount: number) =>
 
 export function MonthlyPayoutScreen({ navigation }: Props) {
   const { t } = useTranslation();
-  const [isLoading] = useState(false);
-  const [payouts] = useState<MonthlyPayoutItem[]>(MOCK_MONTHLY_PAYOUTS);
+  const token = useAppSelector(state => state.auth.token);
+  const astroIdFromStore = useAppSelector(state => state.auth.astroId);
+  const astroId = astroIdFromStore?.trim().toUpperCase() ?? '';
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [payouts, setPayouts] = useState<MonthlyPayoutItem[]>([]);
+  const loadInFlightRef = useRef(false);
+  const hasLoadedRef = useRef(false);
 
   const statusLabel = useMemo(
     () => ({
@@ -41,20 +53,83 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
     [t],
   );
 
+  const loadPayouts = useCallback(async () => {
+    if (!token || !astroId) {
+      setPayouts([]);
+      setIsLoading(false);
+      hasLoadedRef.current = false;
+      return;
+    }
+
+    if (loadInFlightRef.current || hasLoadedRef.current) {
+      return;
+    }
+
+    loadInFlightRef.current = true;
+    setIsLoading(true);
+    try {
+      const response = await astroApi.getMonthlyReports(astroId);
+      setPayouts(mapMonthlyReportsResponse(response));
+      hasLoadedRef.current = true;
+    } catch (error) {
+      setPayouts([]);
+      const message =
+        (error as { message?: string })?.message ??
+        'Failed to load monthly payouts';
+      Alert.alert(t('monthlyPayout.downloadUnavailableTitle'), message);
+    } finally {
+      setIsLoading(false);
+      loadInFlightRef.current = false;
+    }
+  }, [astroId, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadPayouts();
+      return () => {
+        hasLoadedRef.current = false;
+      };
+    }, [loadPayouts]),
+  );
+
   const onDownload = useCallback(
     async (item: MonthlyPayoutItem) => {
-      const url = item.downloadUrl?.trim();
+      let url = item.downloadUrl?.trim();
+
+      if (!url && item.month != null && item.year != null && astroId) {
+        try {
+          const response = await astroApi.getMonthlyReports(astroId, {
+            month: item.month,
+            year: item.year,
+          });
+          url = extractMonthlyReportDownloadUrl(response) ?? undefined;
+        } catch {
+          Alert.alert(
+            t('monthlyPayout.downloadUnavailableTitle'),
+            t('monthlyPayout.downloadFailed'),
+          );
+          return;
+        }
+      }
+
       if (!url) {
-        Alert.alert(t('monthlyPayout.downloadUnavailableTitle'), t('monthlyPayout.downloadUnavailable'));
+        Alert.alert(
+          t('monthlyPayout.downloadUnavailableTitle'),
+          t('monthlyPayout.downloadUnavailable'),
+        );
         return;
       }
+
       try {
         await Linking.openURL(url);
       } catch {
-        Alert.alert(t('monthlyPayout.downloadUnavailableTitle'), t('monthlyPayout.downloadFailed'));
+        Alert.alert(
+          t('monthlyPayout.downloadUnavailableTitle'),
+          t('monthlyPayout.downloadFailed'),
+        );
       }
     },
-    [t],
+    [astroId, t],
   );
 
   const renderItem = useCallback(
@@ -67,16 +142,19 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
           <View style={styles.cardBody}>
             <Text style={styles.monthText}>
               {item.monthLabel}{' '}
-              <Text style={statusColor}>
-                ( {statusLabel[item.status]} )
-              </Text>
+              <Text style={statusColor}>( {statusLabel[item.status]} )</Text>
             </Text>
-            <Text style={styles.amountText}>( ₹ {formatAmount(item.amount)} )</Text>
+            <Text style={styles.amountText}>
+              ( ₹ {formatAmount(item.amount)} )
+            </Text>
           </View>
 
           <Pressable
             onPress={() => onDownload(item)}
-            style={({ pressed }) => [styles.downloadButton, pressed && styles.downloadPressed]}
+            style={({ pressed }) => [
+              styles.downloadButton,
+              pressed && styles.downloadPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel={t('monthlyPayout.download')}
           >
@@ -103,7 +181,7 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
       ) : (
         <FlatList
           data={payouts}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

@@ -11,7 +11,8 @@ import { fcmTrace, fcmTraceError } from './fcmDebug';
 const PENDING_KEY = 'pending_incoming_chat_v1';
 
 /** Discard a stale pending payload after this many ms (notification was likely cancelled). */
-const STALE_AFTER_MS = 60 * 1000;
+/** Cold start after kill can take a few seconds before JS reads storage. */
+const STALE_AFTER_MS = 120 * 1000;
 
 type StoredPayload = {
   params: OrderStackParamList['IncomingChatRequest'];
@@ -32,6 +33,31 @@ export async function setPendingIncomingChat(
     );
   } catch (error) {
     fcmTraceError('pendingIncomingChat: setPendingIncomingChat failed', error);
+  }
+}
+
+/** Read without consuming — used while retrying overlay open on cold start. */
+export async function peekPendingIncomingChat(): Promise<
+  OrderStackParamList['IncomingChatRequest'] | null
+> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as StoredPayload;
+    if (!parsed?.params) {
+      return null;
+    }
+    if (Date.now() - (parsed.storedAt ?? 0) > STALE_AFTER_MS) {
+      await AsyncStorage.removeItem(PENDING_KEY);
+      fcmTrace('pendingIncomingChat: discarded stale payload (peek)');
+      return null;
+    }
+    return parsed.params;
+  } catch (error) {
+    fcmTraceError('pendingIncomingChat: peekPendingIncomingChat failed', error);
+    return null;
   }
 }
 

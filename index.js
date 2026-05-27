@@ -32,6 +32,7 @@ import {
   setPendingIncomingChat,
 } from './src/services/push/pendingIncomingChat';
 import {
+  persistIncomingChatPayloadNative,
   startIncomingChatNative,
   stopIncomingChatNative,
 } from './src/services/push/incomingChatNative';
@@ -45,6 +46,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
     const flat = flattenNotificationData(detail.notification.data);
     const params = getIncomingChatParamsFromData(flat);
     if (params) {
+      await persistIncomingChatPayloadNative(params);
       await setPendingIncomingChat(params);
       fcmTrace('notifee BG PRESS stored pending room=', params.roomId);
     }
@@ -104,6 +106,10 @@ function canEnterMainAppFromStore() {
  */
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const captured = captureFcmMessage('background', remoteMessage);
+
+  console.log('captured==>>>>', captured);
+
+  console.log('remoteMessage', remoteMessage);
   fcmTrace(
     'BG handler ▶ messageId=',
     remoteMessage?.messageId ?? '(none)',
@@ -133,6 +139,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   );
   let handledNatively = false;
   if (Platform.OS === 'android' && params) {
+    await persistIncomingChatPayloadNative(params);
     await setPendingIncomingChat(params);
     /**
      * Backend currently sends a `notification` field which makes Android
@@ -148,16 +155,23 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     }
     handledNatively = await startIncomingChatNative(params);
     fcmTrace('BG handler native handled? ', handledNatively);
-  }
-  if (!handledNatively) {
-    if (remoteMessage?.notification) {
-      fcmTrace(
-        'BG handler skipping Notifee — FCM already displayed notification (uses sound_channel)',
-      );
-    } else {
-      fcmTrace('BG handler → falling back to Notifee notification');
-      await showLocalNotificationFromRemoteMessage(remoteMessage);
-    }
+
+    /**
+     * Killed app: native `startActivity` is often blocked; Notifee `fullScreenAction`
+     * is what actually wakes MainActivity so JS can show the custom Accept/Reject UI.
+     * When the native service already rings, use a silent Notifee notification.
+     */
+    fcmTrace(
+      'BG handler → Notifee full-screen wake (skipSound=',
+      String(handledNatively),
+      ')',
+    );
+    await showLocalNotificationFromRemoteMessage(remoteMessage, {
+      skipSound: handledNatively,
+    });
+  } else if (!remoteMessage?.notification) {
+    fcmTrace('BG handler → Notifee (non-incoming / data-only)');
+    await showLocalNotificationFromRemoteMessage(remoteMessage);
   }
 });
 

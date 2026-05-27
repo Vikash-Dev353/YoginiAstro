@@ -1,5 +1,8 @@
-import { apiService } from './client';
+import type { GetMonthlyReportsResponse } from '../../utils/monthlyPayoutMapper';
+import { apiClient, apiService } from './client';
 import { API_ROUTES } from './routes';
+
+export type { GetMonthlyReportsResponse } from '../../utils/monthlyPayoutMapper';
 
 const WAITLIST_TTL_MS = 10 * 60 * 1000;
 
@@ -451,6 +454,13 @@ export type AstroProfile = {
   country?: string;
   pincode?: string;
   profileImage?: string;
+  aadhar?: string;
+  pan?: string;
+  passBookOrCancelledCheque?: string;
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
   speciality?: string[] | string;
   /** When backend exposes approval state */
   isApproved?: boolean;
@@ -504,6 +514,18 @@ type WaitlistCacheEntry = {
 const waitlistCache = new Map<string, WaitlistCacheEntry>();
 const waitlistInFlight = new Map<string, Promise<WaitlistResponse>>();
 
+type MonthlyReportsCacheEntry = {
+  fetchedAt: number;
+  data: GetMonthlyReportsResponse;
+};
+
+const MONTHLY_REPORTS_TTL_MS = 60_000;
+const monthlyReportsCache = new Map<string, MonthlyReportsCacheEntry>();
+const monthlyReportsInFlight = new Map<
+  string,
+  Promise<GetMonthlyReportsResponse>
+>();
+
 export const astroApi = {
   getOnline: async (payload: GetOnlinePayload) =>
     apiService.post<OnlineStatusResponse>(API_ROUTES.auth.getOnline, payload),
@@ -541,6 +563,56 @@ export const astroApi = {
       API_ROUTES.auth.getMonthlyEarnings,
       payload,
     ),
+  getMonthlyReports: async (
+    astroId: string,
+    params?: { month?: number; year?: number },
+  ) => {
+    const cacheKey = astroId.trim().toUpperCase();
+    const hasPeriod =
+      params?.month != null &&
+      params?.year != null &&
+      Number.isFinite(params.month) &&
+      Number.isFinite(params.year);
+
+    if (!hasPeriod) {
+      const cached = monthlyReportsCache.get(cacheKey);
+      if (cached && Date.now() - cached.fetchedAt < MONTHLY_REPORTS_TTL_MS) {
+        return cached.data;
+      }
+      const inFlight = monthlyReportsInFlight.get(cacheKey);
+      if (inFlight) {
+        return inFlight;
+      }
+    }
+
+    const url = API_ROUTES.auth.monthlyReports(cacheKey);
+    const request = apiClient
+      .get<GetMonthlyReportsResponse>(url, {
+        ...(hasPeriod
+          ? { data: { month: params!.month, year: params!.year } }
+          : {}),
+      })
+      .then(response => response.data)
+      .then(data => {
+        if (!hasPeriod) {
+          monthlyReportsCache.set(cacheKey, {
+            fetchedAt: Date.now(),
+            data,
+          });
+        }
+        return data;
+      })
+      .finally(() => {
+        if (!hasPeriod) {
+          monthlyReportsInFlight.delete(cacheKey);
+        }
+      });
+
+    if (!hasPeriod) {
+      monthlyReportsInFlight.set(cacheKey, request);
+    }
+    return request;
+  },
   getRecentConsultations: async (
     astroId: string,
     limit: number = 20,

@@ -25,7 +25,7 @@ import {
   checkForAppUpdate,
   type UpdateDecision,
 } from '../services/update/appUpdateService';
-import { IncomingChatPushOverlay } from '../components/push/IncomingChatPushOverlay';
+import { CustomIncomingNotificationScreen } from '../components/push/CustomIncomingNotificationScreen';
 import { foregroundIncomingOverlayActiveRef } from '../services/push/foregroundIncomingOverlay';
 import {
   flushPendingWaitlistFcmNavigation,
@@ -43,15 +43,15 @@ import {
 } from '../services/push/notificationDisplay';
 import {
   acceptIncomingChatFromPush,
+  flushPendingIncomingChatAccept,
   rejectIncomingChatFromPush,
 } from '../services/push/incomingChatAcceptFlow';
 import {
   clearPendingIncomingChat,
   setPendingIncomingChat,
-  takePendingIncomingChat,
 } from '../services/push/pendingIncomingChat';
+import { startIncomingChatOverlayProbe } from '../services/push/incomingChatOverlayProbe';
 import {
-  consumeIncomingChatLaunchParams,
   startIncomingChatNative,
   stopIncomingChatNative,
   subscribeIncomingChatIntent,
@@ -113,57 +113,64 @@ export function RootNavigator() {
     void initializeLocalNotifications();
   }, []);
 
-  /**
-   * Native foreground service launches MainActivity with intent extras carrying
-   * the chat payload. Read them on every mount + appear-foreground so the
-   * overlay opens regardless of whether JS booted fresh or just resumed.
-   *
-   * Also drains the AsyncStorage fallback (`pendingIncomingChat`) in case the
-   * native bridge isn't available (older builds, iOS).
-   */
-  useEffect(() => {
-    if (
-      isBootstrapping ||
-      isLanguageBootstrapping ||
-      !canEnterMainApp ||
-      !isAppForeground
-    ) {
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      const fromIntent = await consumeIncomingChatLaunchParams();
-      if (cancelled) return;
-      if (fromIntent) {
-        fcmTrace(
-          'RootNavigator: launch intent overlay → room=',
-          fromIntent.roomId,
-        );
-        void cancelIncomingChatNotifications();
-        void stopIncomingChatNative();
-        foregroundIncomingOverlayActiveRef.current = true;
-        setIncomingChatOverlay(fromIntent);
-        return;
-      }
-      const fromStorage = await takePendingIncomingChat();
-      if (cancelled || !fromStorage) return;
-      fcmTrace(
-        'RootNavigator: AsyncStorage overlay → room=',
-        fromStorage.roomId,
-      );
+  const showIncomingOverlay = useCallback(
+    (params: OrderStackParamList['IncomingChatRequest'], source: string) => {
+      fcmTrace('RootNavigator: show incoming overlay ←', source, 'room=', params.roomId);
       void cancelIncomingChatNotifications();
       void stopIncomingChatNative();
       foregroundIncomingOverlayActiveRef.current = true;
-      setIncomingChatOverlay(fromStorage);
-    })();
-    return () => {
-      cancelled = true;
-    };
+      setIncomingChatOverlay(params);
+    },
+    [],
+  );
+
+  /**
+   * Killed / cold start: intent extras + AsyncStorage are often ready only after
+   * several frames. Retry until we can show the custom Accept/Reject screen.
+   */
+  useEffect(() => {
+    const probeEnabled =
+      isAppForeground &&
+      !isLanguageBootstrapping &&
+      (canEnterMainApp || isBootstrapping) &&
+      !incomingChatOverlay;
+
+    if (!probeEnabled) {
+      return;
+    }
+
+    return startIncomingChatOverlayProbe(
+      launch => {
+        if (!launch.params) {
+          return;
+        }
+        if (launch.decision === 'accept' && canEnterMainApp) {
+          fcmTrace('RootNavigator: probe → accept → ConsultationChat');
+          void cancelIncomingChatNotifications();
+          void stopIncomingChatNative();
+          foregroundIncomingOverlayActiveRef.current = false;
+          setIncomingChatOverlay(null);
+          acceptIncomingChatFromPush(dispatch, launch.params);
+          return;
+        }
+        if (launch.decision === 'reject' && canEnterMainApp) {
+          void cancelIncomingChatNotifications();
+          void stopIncomingChatNative();
+          rejectIncomingChatFromPush(dispatch, launch.params);
+          return;
+        }
+        showIncomingOverlay(launch.params, 'probe');
+      },
+      { maxAttempts: 30, intervalMs: 400 },
+    );
   }, [
+    canEnterMainApp,
+    dispatch,
+    incomingChatOverlay,
+    isAppForeground,
     isBootstrapping,
     isLanguageBootstrapping,
-    canEnterMainApp,
-    isAppForeground,
+    showIncomingOverlay,
   ]);
 
   /**
@@ -181,10 +188,10 @@ export function RootNavigator() {
       void cancelIncomingChatNotifications();
       void stopIncomingChatNative();
       foregroundIncomingOverlayActiveRef.current = true;
-      setIncomingChatOverlay(params);
+      showIncomingOverlay(params, 'native-intent');
     });
     return () => sub?.remove();
-  }, [canEnterMainApp]);
+  }, [canEnterMainApp, showIncomingOverlay]);
 
   useEffect(() => {
     let active = true;
@@ -301,7 +308,7 @@ export function RootNavigator() {
       );
       const overlayParams = handleIncomingChatNotificationOpen(
         dispatch,
-        remoteMessage.data,
+        remoteMessage,
         canEnterMainApp,
       );
       if (overlayParams) {
@@ -326,7 +333,7 @@ export function RootNavigator() {
         const overlayParams = inForegroundUi
           ? handleIncomingChatNotificationOpen(
               dispatch,
-              remoteMessage.data,
+              remoteMessage,
               canEnterMainApp,
             )
           : null;
@@ -350,7 +357,7 @@ export function RootNavigator() {
         handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
         const params = handleIncomingChatNotificationOpen(
           dispatch,
-          remoteMessage.data,
+          remoteMessage,
           canEnterMainApp,
         );
         let handledNatively = false;
@@ -408,7 +415,20 @@ export function RootNavigator() {
         return;
       }
       fcmTrace('Notifee handler [', source, '] keys=', Object.keys(flat).join(','));
-      const params = handleIncomingChatNotificationOpen(dispatch, flat, canEnterMainApp);
+      const params = handleIncomingChatNotificationOpen(
+        dispatch,
+        {
+          data: flat,
+          notification:
+            typeof n.title === 'string' || typeof n.body === 'string'
+              ? {
+                  title: typeof n.title === 'string' ? n.title : undefined,
+                  body: typeof n.body === 'string' ? n.body : undefined,
+                }
+              : undefined,
+        } as FirebaseMessagingTypes.RemoteMessage,
+        canEnterMainApp,
+      );
       if (params) {
         foregroundIncomingOverlayActiveRef.current = true;
         setIncomingChatOverlay(params);
@@ -455,6 +475,20 @@ export function RootNavigator() {
     flushPendingWaitlistFcmNavigation(canEnterMainApp);
   }, [canEnterMainApp]);
 
+  const handleNavigationReady = useCallback(() => {
+    if (!canEnterMainApp) {
+      return;
+    }
+    void flushPendingIncomingChatAccept(dispatch);
+  }, [canEnterMainApp, dispatch]);
+
+  useEffect(() => {
+    if (!canEnterMainApp || !navigationRef.isReady()) {
+      return;
+    }
+    void flushPendingIncomingChatAccept(dispatch);
+  }, [canEnterMainApp, dispatch]);
+
   useEffect(() => {
     if (!canEnterMainApp && incomingChatOverlay) {
       foregroundIncomingOverlayActiveRef.current = false;
@@ -472,18 +506,22 @@ export function RootNavigator() {
     }
   }, [incomingChatOverlay]);
 
-  if (isBootstrapping || isLanguageBootstrapping) {
-    return <AppLoader />;
-  }
-
   return (
     <>
-      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-        {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
-      </NavigationContainer>
+      {isBootstrapping || isLanguageBootstrapping ? (
+        <AppLoader />
+      ) : (
+        <NavigationContainer
+          ref={navigationRef}
+          theme={navigationTheme}
+          onReady={handleNavigationReady}
+        >
+          {canEnterMainApp ? <MainTabNavigator /> : <AuthNavigator />}
+        </NavigationContainer>
+      )}
 
-      <IncomingChatPushOverlay
-        visible={Boolean(incomingChatOverlay)}
+      <CustomIncomingNotificationScreen
+        visible={Boolean(incomingChatOverlay) && canEnterMainApp}
         payload={incomingChatOverlay}
         onAccept={onIncomingOverlayAccept}
         onReject={onIncomingOverlayReject}

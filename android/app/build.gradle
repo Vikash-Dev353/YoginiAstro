@@ -77,9 +77,11 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // namespace drives R/BuildConfig + manifest-relative class names (Kotlin lives in com.yoginiastro).
     namespace "com.yoginiastro"
     defaultConfig {
-        applicationId "com.yoginiastro"
+        // Must match a package_name entry in android/app/google-services.json.
+        applicationId "com.app.yoginiastrologer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -110,6 +112,10 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // YoginiFirebaseMessagingService extends RN Firebase messaging service
+    implementation(project(":react-native-firebase_messaging"))
+    implementation("com.google.firebase:firebase-messaging")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

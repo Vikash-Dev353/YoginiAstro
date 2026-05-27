@@ -7,11 +7,16 @@ import {
   setAstroChatData,
   setSocketChatDisconnect,
 } from '../../store/slices/socketSlice';
+import { fcmTrace } from './fcmDebug';
+import {
+  clearPendingIncomingChatAccept,
+  setPendingIncomingChatAccept,
+} from './pendingIncomingChatAccept';
 
-const NAV_RETRY_MS = 120;
-const MAX_NAV_RETRIES = 45;
+const NAV_RETRY_MS = 150;
+const MAX_NAV_RETRIES = 80;
 
-function navigateToConsultationChat(
+export function navigateToConsultationChat(
   p: OrderStackParamList['IncomingChatRequest'],
   from: string,
 ): void {
@@ -29,11 +34,15 @@ function navigateToConsultationChat(
           customerImage: p.customerImage ?? undefined,
         },
       });
+      fcmTrace('navigateToConsultationChat OK room=', p.roomId);
       return;
     }
     if (attempts < MAX_NAV_RETRIES) {
       setTimeout(tryNav, NAV_RETRY_MS);
+      return;
     }
+    fcmTrace('navigateToConsultationChat deferred (nav not ready) room=', p.roomId);
+    void setPendingIncomingChatAccept(p);
   };
   tryNav();
 }
@@ -59,7 +68,23 @@ export function acceptIncomingChatFromPush(
     }),
   );
   dispatch(acceptChat({ from, roomId: p.roomId }));
+  void clearPendingIncomingChatAccept();
   navigateToConsultationChat(p, from);
+}
+
+/** Call when NavigationContainer is ready (cold start after native Accept). */
+export async function flushPendingIncomingChatAccept(
+  dispatch: AppDispatch,
+): Promise<boolean> {
+  const { takePendingIncomingChatAccept } = await import(
+    './pendingIncomingChatAccept'
+  );
+  const pending = await takePendingIncomingChatAccept();
+  if (!pending?.roomId) {
+    return false;
+  }
+  acceptIncomingChatFromPush(dispatch, pending);
+  return true;
 }
 
 export function rejectIncomingChatFromPush(

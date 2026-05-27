@@ -5,11 +5,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import {
-  launchCamera,
-  launchImageLibrary,
-  type ImagePickerResponse,
-} from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import {
   Alert,
   FlatList,
@@ -142,6 +138,70 @@ const specialityValuesToJsonPayload = (values: string[]) => {
   const list = values.length ? values : ['Business'];
   return JSON.stringify(list);
 };
+
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_NUMBER_REGEX = /^\d{9,18}$/;
+const ACCOUNT_HOLDER_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
+
+const appendLocalImageToFormData = (
+  formData: FormData,
+  fieldName: string,
+  uri: string | null | undefined,
+) => {
+  const trimmed = uri?.trim();
+  if (!trimmed || trimmed.toLowerCase().startsWith('http')) {
+    return;
+  }
+  const fileName = trimmed.split('/').pop() || `${fieldName}-${Date.now()}.jpg`;
+  formData.append(
+    fieldName,
+    {
+      uri: trimmed,
+      name: fileName,
+      type: 'image/jpeg',
+    } as never,
+  );
+};
+
+const hasDocumentUri = (uri: string | null | undefined) => Boolean(uri?.trim());
+
+type DocumentUploadFieldProps = {
+  label: string;
+  imageUri: string | null;
+  onPressUpload: () => void;
+  photoSelectedLabel: string;
+};
+
+const DocumentUploadField = memo(function DocumentUploadField({
+  label,
+  imageUri,
+  onPressUpload,
+  photoSelectedLabel,
+}: DocumentUploadFieldProps) {
+  return (
+    <View style={docUploadStyles.wrap}>
+      <Text style={docUploadStyles.label}>
+        {label}
+        <Text style={docUploadStyles.req}>*</Text>
+      </Text>
+      <Pressable
+        style={docUploadStyles.uploadBox}
+        onPress={onPressUpload}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={docUploadStyles.preview} />
+        ) : (
+          <Text style={docUploadStyles.uploadHint}>📷 {label}</Text>
+        )}
+      </Pressable>
+      {imageUri ? (
+        <Text style={docUploadStyles.selectedText}>{photoSelectedLabel}</Text>
+      ) : null}
+    </View>
+  );
+});
 
 function tokenizeProfileListField(
   raw: string[] | string | undefined,
@@ -361,6 +421,13 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
 
   const [fullName, setFullName] = useState('');
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [aadharImageUri, setAadharImageUri] = useState<string | null>(null);
+  const [panImageUri, setPanImageUri] = useState<string | null>(null);
+  const [passBookImageUri, setPassBookImageUri] = useState<string | null>(null);
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
   const [gender, setGender] = useState('');
   const [dob, setDob] = useState('');
   const [dobDate, setDobDate] = useState(new Date(1990, 0, 1));
@@ -425,6 +492,19 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     if (profile.profileImage?.trim()) {
       setProfileImageUri(profile.profileImage.trim());
     }
+    if (profile.aadhar?.trim()) {
+      setAadharImageUri(profile.aadhar.trim());
+    }
+    if (profile.pan?.trim()) {
+      setPanImageUri(profile.pan.trim());
+    }
+    if (profile.passBookOrCancelledCheque?.trim()) {
+      setPassBookImageUri(profile.passBookOrCancelledCheque.trim());
+    }
+    setAccountHolderName(profile.accountHolderName?.trim() || '');
+    setBankName(profile.bankName?.trim() || '');
+    setAccountNumber(profile.accountNumber?.trim() || '');
+    setIfscCode(profile.ifscCode?.trim().toUpperCase() || '');
 
     const parsedDob = parseApiDob(profile.dob);
     if (parsedDob) {
@@ -615,6 +695,67 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
       Alert.alert('Error', 'Please select at least one language.');
       return;
     }
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Please enter your full name.');
+      return;
+    }
+    if (!gender.trim()) {
+      Alert.alert('Error', 'Please select gender.');
+      return;
+    }
+    if (!address.trim()) {
+      Alert.alert('Error', 'Please enter address.');
+      return;
+    }
+    if (!/^\d{6}$/.test(pincode.trim())) {
+      Alert.alert('Error', 'Please enter a valid 6-digit pincode.');
+      return;
+    }
+    if (!stateName.trim() || !city.trim()) {
+      Alert.alert('Error', 'Please select state and city.');
+      return;
+    }
+    if (!hasDocumentUri(profileImageUri)) {
+      Alert.alert('Error', 'Please upload profile photo.');
+      return;
+    }
+    if (!hasDocumentUri(aadharImageUri)) {
+      Alert.alert('Error', 'Please upload Aadhar card photo.');
+      return;
+    }
+    if (!hasDocumentUri(panImageUri)) {
+      Alert.alert('Error', 'Please upload PAN card photo.');
+      return;
+    }
+    if (!hasDocumentUri(passBookImageUri)) {
+      Alert.alert('Error', 'Please upload passbook or cancelled cheque photo.');
+      return;
+    }
+
+    const holderName = accountHolderName.trim();
+    const bank = bankName.trim();
+    const accountNo = accountNumber.trim();
+    const ifsc = ifscCode.trim().toUpperCase();
+
+    if (!ACCOUNT_HOLDER_NAME_REGEX.test(holderName)) {
+      Alert.alert(
+        'Error',
+        'Please enter a valid account holder name (letters only, 2–80 characters).',
+      );
+      return;
+    }
+    if (bank.length < 2) {
+      Alert.alert('Error', 'Please enter bank name.');
+      return;
+    }
+    if (!ACCOUNT_NUMBER_REGEX.test(accountNo)) {
+      Alert.alert('Error', 'Please enter a valid account number (9–18 digits).');
+      return;
+    }
+    if (!IFSC_REGEX.test(ifsc)) {
+      Alert.alert('Error', 'Please enter a valid IFSC code (e.g. SBIN0001234).');
+      return;
+    }
 
     const mobile =
       decodeMobileFromToken(token) ||
@@ -644,22 +785,19 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     payload.append('country', 'IN');
     payload.append('state', stateName.trim());
     payload.append('city', city.trim());
+    payload.append('accountHolderName', holderName);
+    payload.append('bankName', bank);
+    payload.append('accountNumber', accountNo);
+    payload.append('ifscCode', ifsc);
 
-    if (
-      profileImageUri &&
-      !profileImageUri.toLowerCase().startsWith('http')
-    ) {
-      const fileName =
-        profileImageUri.split('/').pop() || `profile-${Date.now()}.jpg`;
-      payload.append(
-        'profileImage',
-        {
-          uri: profileImageUri,
-          name: fileName,
-          type: 'image/jpeg',
-        } as never,
-      );
-    }
+    appendLocalImageToFormData(payload, 'profileImage', profileImageUri);
+    appendLocalImageToFormData(payload, 'aadhar', aadharImageUri);
+    appendLocalImageToFormData(payload, 'pan', panImageUri);
+    appendLocalImageToFormData(
+      payload,
+      'passBookOrCancelledCheque',
+      passBookImageUri,
+    );
 
     try {
       setIsSubmitting(true);
@@ -688,15 +826,22 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
       setIsSubmitting(false);
     }
   }, [
+    aadharImageUri,
+    accountHolderName,
+    accountNumber,
     address,
     astroId,
+    bankName,
     city,
     description,
     dobDate,
     experience,
     fullName,
     gender,
+    ifscCode,
     selectedLanguages,
+    panImageUri,
+    passBookImageUri,
     pincode,
     profileImageUri,
     selectedSkills,
@@ -725,46 +870,73 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
   }, [dispatch, navigation]);
 
   const closeModal = useCallback(() => setModal({ kind: null }), []);
-  const onImagePicked = useCallback((result: ImagePickerResponse) => {
-    if (result.didCancel || result.errorCode) {
-      return;
-    }
-    const selectedUri = result.assets?.[0]?.uri;
-    if (selectedUri) {
-      setProfileImageUri(selectedUri);
-    }
-  }, []);
-  const openCamera = useCallback(async () => {
-    try {
-      const result = await launchCamera({
-        mediaType: 'photo',
-        cameraType: 'back',
-        quality: 0.9,
-      });
-      onImagePicked(result);
-    } catch {
-      Alert.alert('Error', 'Unable to open camera');
-    }
-  }, [onImagePicked]);
-  const openGallery = useCallback(async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.9,
-        selectionLimit: 1,
-      });
-      onImagePicked(result);
-    } catch {
-      Alert.alert('Error', 'Unable to open gallery');
-    }
-  }, [onImagePicked]);
+  const pickImageFromSource = useCallback(
+    async (
+      source: 'camera' | 'gallery',
+      onUriSelected: (uri: string) => void,
+    ) => {
+      try {
+        const result =
+          source === 'camera'
+            ? await launchCamera({
+                mediaType: 'photo',
+                cameraType: 'back',
+                quality: 0.9,
+              })
+            : await launchImageLibrary({
+                mediaType: 'photo',
+                quality: 0.9,
+                selectionLimit: 1,
+              });
+        if (result.didCancel || result.errorCode) {
+          return;
+        }
+        const selectedUri = result.assets?.[0]?.uri;
+        if (selectedUri) {
+          onUriSelected(selectedUri);
+        }
+      } catch {
+        Alert.alert('Error', 'Unable to pick image');
+      }
+    },
+    [],
+  );
+
+  const openDocumentPicker = useCallback(
+    (title: string, onUriSelected: (uri: string) => void) => {
+      Alert.alert(title, t('completeProfile.choosePhotoSource'), [
+        {
+          text: t('completeProfile.camera'),
+          onPress: () => pickImageFromSource('camera', onUriSelected),
+        },
+        {
+          text: t('completeProfile.gallery'),
+          onPress: () => pickImageFromSource('gallery', onUriSelected),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [pickImageFromSource, t],
+  );
+
   const onUploadProfilePhoto = useCallback(() => {
-    Alert.alert('Upload Profile Photo', 'Choose photo source', [
-      { text: 'Camera', onPress: openCamera },
-      { text: 'Gallery', onPress: openGallery },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [openCamera, openGallery]);
+    openDocumentPicker(t('completeProfile.uploadPhoto'), setProfileImageUri);
+  }, [openDocumentPicker, t]);
+
+  const onUploadAadhar = useCallback(() => {
+    openDocumentPicker(t('completeProfile.uploadAadhar'), setAadharImageUri);
+  }, [openDocumentPicker, t]);
+
+  const onUploadPan = useCallback(() => {
+    openDocumentPicker(t('completeProfile.uploadPan'), setPanImageUri);
+  }, [openDocumentPicker, t]);
+
+  const onUploadPassbook = useCallback(() => {
+    openDocumentPicker(
+      t('completeProfile.uploadPassbook'),
+      setPassBookImageUri,
+    );
+  }, [openDocumentPicker, t]);
   const openDobPicker = useCallback(() => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
@@ -1094,8 +1266,91 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
               <Text style={styles.chevron}>▼</Text>
             </Pressable>
 
+            <Text style={styles.sectionTitle}>
+              {t('completeProfile.bankDetails')}
+            </Text>
+
+            <AppInput
+              label={t('completeProfile.accountHolderName')}
+              required
+              value={accountHolderName}
+              onChangeText={setAccountHolderName}
+              placeholder={t('completeProfile.enterAccountHolderName')}
+              autoCapitalize="words"
+              wrapperStyle={styles.field}
+              inputContainerStyle={styles.inputBox}
+            />
+
+            <AppInput
+              label={t('completeProfile.bankName')}
+              required
+              value={bankName}
+              onChangeText={setBankName}
+              placeholder={t('completeProfile.enterBankName')}
+              autoCapitalize="words"
+              wrapperStyle={styles.field}
+              inputContainerStyle={styles.inputBox}
+            />
+
+            <View style={styles.row}>
+              <View style={[styles.half, styles.halfLeft]}>
+                <AppInput
+                  label={t('completeProfile.accountNumber')}
+                  required
+                  value={accountNumber}
+                  onChangeText={value =>
+                    setAccountNumber(value.replace(/\D/g, ''))
+                  }
+                  placeholder={t('completeProfile.enterAccountNumber')}
+                  keyboardType="number-pad"
+                  maxLength={18}
+                  wrapperStyle={styles.field}
+                  inputContainerStyle={styles.inputBox}
+                />
+              </View>
+              <View style={[styles.half, styles.halfRight]}>
+                <AppInput
+                  label={t('completeProfile.ifscCode')}
+                  required
+                  value={ifscCode}
+                  onChangeText={value =>
+                    setIfscCode(value.replace(/\s/g, '').toUpperCase())
+                  }
+                  placeholder={t('completeProfile.enterIfscCode')}
+                  autoCapitalize="characters"
+                  maxLength={11}
+                  wrapperStyle={styles.field}
+                  inputContainerStyle={styles.inputBox}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>
+              {t('completeProfile.kycDocuments')}
+            </Text>
+
+            <DocumentUploadField
+              label={t('completeProfile.uploadAadhar')}
+              imageUri={aadharImageUri}
+              onPressUpload={onUploadAadhar}
+              photoSelectedLabel={t('completeProfile.photoSelected')}
+            />
+            <DocumentUploadField
+              label={t('completeProfile.uploadPan')}
+              imageUri={panImageUri}
+              onPressUpload={onUploadPan}
+              photoSelectedLabel={t('completeProfile.photoSelected')}
+            />
+            <DocumentUploadField
+              label={t('completeProfile.uploadPassbook')}
+              imageUri={passBookImageUri}
+              onPressUpload={onUploadPassbook}
+              photoSelectedLabel={t('completeProfile.photoSelected')}
+            />
+
             <AppButton
               title={t('completeProfile.submitRegistration')}
+              
               onPress={onSubmit}
               loading={isSubmitting}
               disabled={isSubmitting}
@@ -1458,5 +1713,54 @@ const styles = StyleSheet.create({
     fontSize: normalizeFont(15),
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  sectionTitle: {
+    marginTop: hp(2.5),
+    marginBottom: hp(1),
+    fontSize: normalizeFont(16),
+    fontWeight: '700',
+    color: LABEL_BROWN,
+  },
+});
+
+const docUploadStyles = StyleSheet.create({
+  wrap: {
+    marginBottom: 14,
+  },
+  label: {
+    fontSize: normalizeFont(14),
+    color: colors.textPrimary,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  req: {
+    color: colors.error,
+  },
+  uploadBox: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: INPUT_BORDER,
+    borderRadius: 12,
+    backgroundColor: '#FFFCF7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  uploadHint: {
+    fontSize: normalizeFont(14),
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+  preview: {
+    width: '100%',
+    height: 160,
+    resizeMode: 'cover',
+  },
+  selectedText: {
+    marginTop: 6,
+    color: '#2E6A36',
+    fontSize: normalizeFont(12),
+    fontWeight: '600',
   },
 });

@@ -137,6 +137,23 @@ export const translations = {
       returnToLogin: 'Return to Login',
       submitTitle: 'Registration',
       submitMessage: 'Your details have been submitted.',
+      bankDetails: 'Bank Details',
+      accountHolderName: 'Account Holder Name',
+      enterAccountHolderName: 'Enter account holder name',
+      bankName: 'Bank Name',
+      enterBankName: 'Enter bank name',
+      accountNumber: 'Account Number',
+      enterAccountNumber: 'Enter account number',
+      ifscCode: 'IFSC Code',
+      enterIfscCode: 'Enter IFSC code',
+      kycDocuments: 'KYC Documents',
+      uploadAadhar: 'Upload Aadhar Card',
+      uploadPan: 'Upload PAN Card',
+      uploadPassbook: 'Upload Passbook / Cancelled Cheque',
+      photoSelected: 'Photo selected',
+      choosePhotoSource: 'Choose photo source',
+      camera: 'Camera',
+      gallery: 'Gallery',
     },
     reviewScreen: {
       loading: 'Loading reviews...',
@@ -315,6 +332,23 @@ export const translations = {
       returnToLogin: 'लॉगिन पर वापस जाएं',
       submitTitle: 'पंजीकरण',
       submitMessage: 'आपकी जानकारी जमा की गई है।',
+      bankDetails: 'बैंक विवरण',
+      accountHolderName: 'खाताधारक का नाम',
+      enterAccountHolderName: 'खाताधारक का नाम दर्ज करें',
+      bankName: 'बैंक का नाम',
+      enterBankName: 'बैंक का नाम दर्ज करें',
+      accountNumber: 'खाता संख्या',
+      enterAccountNumber: 'खाता संख्या दर्ज करें',
+      ifscCode: 'IFSC कोड',
+      enterIfscCode: 'IFSC कोड दर्ज करें',
+      kycDocuments: 'KYC दस्तावेज़',
+      uploadAadhar: 'आधार कार्ड अपलोड करें',
+      uploadPan: 'PAN कार्ड अपलोड करें',
+      uploadPassbook: 'पासबुक / रद्द चेक अपलोड करें',
+      photoSelected: 'फोटो चुनी गई',
+      choosePhotoSource: 'फोटो स्रोत चुनें',
+      camera: 'कैमरा',
+      gallery: 'गैलरी',
     },
     reviewScreen: {
       loading: 'रिव्यू लोड हो रहे हैं...',
@@ -474,6 +508,23 @@ export type TranslationKey =
   | 'completeProfile.returnToLogin'
   | 'completeProfile.submitTitle'
   | 'completeProfile.submitMessage'
+  | 'completeProfile.bankDetails'
+  | 'completeProfile.accountHolderName'
+  | 'completeProfile.enterAccountHolderName'
+  | 'completeProfile.bankName'
+  | 'completeProfile.enterBankName'
+  | 'completeProfile.accountNumber'
+  | 'completeProfile.enterAccountNumber'
+  | 'completeProfile.ifscCode'
+  | 'completeProfile.enterIfscCode'
+  | 'completeProfile.kycDocuments'
+  | 'completeProfile.uploadAadhar'
+  | 'completeProfile.uploadPan'
+  | 'completeProfile.uploadPassbook'
+  | 'completeProfile.photoSelected'
+  | 'completeProfile.choosePhotoSource'
+  | 'completeProfile.camera'
+  | 'completeProfile.gallery'
   | 'reviewScreen.loading'
   | 'reviewScreen.empty'
   | 'reviewScreen.error'

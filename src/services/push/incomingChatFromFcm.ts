@@ -99,6 +99,9 @@ export function applyIncomingChatFromFcm(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
 ): boolean {
   const data = remoteMessage.data ?? {};
+
+  console.log('remoteMessage data===>>>>>', remoteMessage)
+
   fcmTrace(
     'applyIncomingChatFromFcm messageId=',
     remoteMessage.messageId ?? '(none)',
@@ -185,6 +188,25 @@ export function applyIncomingChatFromFcm(
  * Returns `null` if this message is not an incoming chat request.
  */
 /** Same parsing as {@link getIncomingChatParamsFromRemoteMessage} for plain `data` (e.g. Notifee `notification.data`). */
+export type IncomingChatLaunchConsume = {
+  params: OrderStackParamList['IncomingChatRequest'] | null;
+  decision?: 'accept' | 'reject';
+};
+
+export function parseIncomingChatLaunchRaw(
+  flat: Record<string, string>,
+): IncomingChatLaunchConsume {
+  const decisionRaw = flat.incomingChatDecision?.trim().toLowerCase();
+  const decision =
+    decisionRaw === 'accept' || decisionRaw === 'reject' ? decisionRaw : undefined;
+  const data = { ...flat };
+  delete data.incomingChatDecision;
+  const params = getIncomingChatParamsFromRemoteMessage({
+    data,
+  } as FirebaseMessagingTypes.RemoteMessage);
+  return { params, decision };
+}
+
 export function getIncomingChatParamsFromData(
   data: FirebaseMessagingTypes.RemoteMessage['data'],
 ): OrderStackParamList['IncomingChatRequest'] | null {
@@ -225,18 +247,14 @@ export function flattenNotificationData(
  */
 export function handleIncomingChatNotificationOpen(
   dispatch: AppDispatch,
-  rawData: FirebaseMessagingTypes.RemoteMessage['data'] | undefined,
+  message: FirebaseMessagingTypes.RemoteMessage,
   canEnterMainApp: boolean,
 ): OrderStackParamList['IncomingChatRequest'] | null {
-  const flat = flattenNotificationData(rawData as Record<string, string | number | boolean | object | undefined>);
-  const remoteMessage = {
-    data: flat,
-  } as FirebaseMessagingTypes.RemoteMessage;
-  handleIncomingFcm(dispatch, remoteMessage, canEnterMainApp);
+  handleIncomingFcm(dispatch, message, canEnterMainApp);
   if (!canEnterMainApp) {
     return null;
   }
-  return getIncomingChatParamsFromData(flat);
+  return getIncomingChatParamsFromRemoteMessage(message);
 }
 
 export function getIncomingChatParamsFromRemoteMessage(
@@ -263,6 +281,13 @@ export function getIncomingChatParamsFromRemoteMessage(
   const customerName =
     String(data.customerName ?? data.userName ?? data.senderName ?? '').trim() ||
     'Unknown User';
+
+  const notificationTitle = String(
+    remoteMessage.notification?.title ?? data.title ?? data.notificationTitle ?? '',
+  ).trim();
+  const notificationBody = String(
+    remoteMessage.notification?.body ?? data.body ?? data.notificationBody ?? '',
+  ).trim();
 
   const profileImage = String(
     data.customerImage ?? data.profileImage ?? data.senderImage ?? '',
@@ -310,6 +335,8 @@ export function getIncomingChatParamsFromRemoteMessage(
     from,
     customerName,
     customerImage: profileImage || null,
+    notificationTitle: notificationTitle || undefined,
+    notificationBody: notificationBody || undefined,
     message: data.message ? String(data.message) : undefined,
     subtitle,
     kundliUrl,

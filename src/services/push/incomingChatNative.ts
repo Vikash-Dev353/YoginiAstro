@@ -9,12 +9,15 @@ import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
   flattenNotificationData,
   getIncomingChatParamsFromData,
+  parseIncomingChatLaunchRaw,
+  type IncomingChatLaunchConsume,
 } from './incomingChatFromFcm';
 
 type IncomingChatBridge = {
   startIncomingChat(payload: Record<string, string>): Promise<boolean>;
   stopIncomingChat(): Promise<boolean>;
   consumeLaunchPayload(): Promise<Record<string, string> | null>;
+  persistIncomingChatPayload(payload: Record<string, string>): Promise<boolean>;
 };
 
 const bridge = (NativeModules as { IncomingChat?: IncomingChatBridge })
@@ -56,6 +59,38 @@ function stringifyForNative(
  *
  * Returns false on iOS / when the bridge isn't installed.
  */
+/** Writes payload to native SharedPreferences (survives killed app + notification tap). */
+export async function persistIncomingChatPayloadNative(
+  params: OrderStackParamList['IncomingChatRequest'],
+): Promise<void> {
+  const mod = ensureAndroid();
+  if (!mod) return;
+  try {
+    const payload = stringifyForNative({
+      type: 'incoming_chat',
+      roomId: params.roomId,
+      from: params.from,
+      senderId: params.from,
+      customerName: params.customerName,
+      title: params.notificationTitle,
+      body: params.notificationBody,
+      customerImage: params.customerImage,
+      message: params.message,
+      subtitle: params.subtitle,
+      kundliUrl: params.kundliUrl,
+      userBalance: params.userBalance,
+      astroPrice: params.astroPrice,
+      kundaliPayload: params.kundaliPayload
+        ? JSON.stringify(params.kundaliPayload)
+        : undefined,
+    });
+    await mod.persistIncomingChatPayload(payload);
+    fcmTrace('IncomingChat native: persistIncomingChatPayload OK room=', params.roomId);
+  } catch (error) {
+    fcmTraceError('IncomingChat native: persistIncomingChatPayload failed', error);
+  }
+}
+
 export async function startIncomingChatNative(
   params: OrderStackParamList['IncomingChatRequest'],
 ): Promise<boolean> {
@@ -68,6 +103,8 @@ export async function startIncomingChatNative(
       from: params.from,
       senderId: params.from,
       customerName: params.customerName,
+      title: params.notificationTitle,
+      body: params.notificationBody,
       customerImage: params.customerImage,
       message: params.message,
       subtitle: params.subtitle,
@@ -106,16 +143,21 @@ export async function stopIncomingChatNative(): Promise<void> {
 export async function consumeIncomingChatLaunchParams(): Promise<
   OrderStackParamList['IncomingChatRequest'] | null
 > {
+  const consumed = await consumeIncomingChatLaunchAction();
+  return consumed.params;
+}
+
+export async function consumeIncomingChatLaunchAction(): Promise<IncomingChatLaunchConsume> {
   const mod = ensureAndroid();
-  if (!mod) return null;
+  if (!mod) return { params: null };
   try {
     const raw = await mod.consumeLaunchPayload();
-    if (!raw) return null;
+    if (!raw) return { params: null };
     const flat = flattenNotificationData(raw);
-    return getIncomingChatParamsFromData(flat);
+    return parseIncomingChatLaunchRaw(flat);
   } catch (error) {
     fcmTraceError('IncomingChat native: consumeLaunchPayload failed', error);
-    return null;
+    return { params: null };
   }
 }
 

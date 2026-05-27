@@ -6,4 +6,11 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+    <style name="IncomingChatFullScreenTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/incoming_bg</item>
+        <item name="android:statusBarColor">@color/incoming_bg</item>
+        <item name="android:navigationBarColor">@color/incoming_bg</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
+
 </resources>

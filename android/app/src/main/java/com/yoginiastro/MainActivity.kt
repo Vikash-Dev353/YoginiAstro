@@ -8,6 +8,8 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.yoginiastro.incoming.IncomingChatFullScreenActivity
+import com.yoginiastro.incoming.IncomingChatPayloadStore
 import com.yoginiastro.incoming.IncomingChatService
 
 class MainActivity : ReactActivity() {
@@ -17,18 +19,21 @@ class MainActivity : ReactActivity() {
   override fun createReactActivityDelegate(): ReactActivityDelegate =
     DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 
+  override fun onStart() {
+    super.onStart()
+    maybeLaunchIncomingFullScreen(intent)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
+    maybeLaunchIncomingFullScreen(intent)
     super.onCreate(savedInstanceState)
     if (isIncomingChatIntent(intent)) {
       applyIncomingChatWindowFlags()
     }
   }
 
-  /**
-   * `singleTask` + foreground service re-launch: forward the new intent to RN
-   * (`IncomingChatModule.onNewIntent`) and keep extras for `consumeLaunchPayload`.
-   */
   override fun onNewIntent(intent: Intent) {
+    maybeLaunchIncomingFullScreen(intent)
     super.onNewIntent(intent)
     setIntent(intent)
     if (isIncomingChatIntent(intent)) {
@@ -36,10 +41,36 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  /**
+   * User tapped the FCM / Notifee notification — open native Accept/Reject UI
+   * immediately (do not wait for React Native to boot).
+   */
+  private fun maybeLaunchIncomingFullScreen(intent: Intent?) {
+    val fromIntent = IncomingChatPayloadStore.readFromIntent(intent)
+    val payload = fromIntent ?: IncomingChatPayloadStore.load(this) ?: return
+
+    IncomingChatPayloadStore.save(this, payload)
+    applyIncomingChatWindowFlags()
+
+    val fullScreenIntent =
+      Intent(this, IncomingChatFullScreenActivity::class.java).apply {
+        flags =
+          Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        payload.forEach { (k, v) -> putExtra(k, v) }
+      }
+    try {
+      startActivity(fullScreenIntent)
+    } catch (_: Throwable) {
+      /* OEM blocked — JS overlay probe + pending AsyncStorage may still recover */
+    }
+  }
+
   private fun isIncomingChatIntent(intent: Intent?): Boolean =
     intent?.action == IncomingChatService.ACTION_INCOMING_CHAT
 
-  /** Show the incoming-chat overlay above the lock screen when the service wakes the app. */
   private fun applyIncomingChatWindowFlags() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
       setShowWhenLocked(true)

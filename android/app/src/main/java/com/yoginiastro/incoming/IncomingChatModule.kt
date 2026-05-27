@@ -30,6 +30,26 @@ class IncomingChatModule(
    * Called from `setBackgroundMessageHandler` so we work even when JS itself
    * has no permission to open an Activity from the background.
    */
+  /** Saves FCM payload to SharedPreferences (tap-to-open + cold start without JS). */
+  @ReactMethod
+  fun persistIncomingChatPayload(payload: ReadableMap, promise: Promise) {
+    try {
+      val map = HashMap<String, String>()
+      val it = payload.keySetIterator()
+      while (it.hasNextKey()) {
+        val key = it.nextKey()
+        val value = payload.getString(key)
+        if (value != null) {
+          map[key] = value
+        }
+      }
+      IncomingChatPayloadStore.save(reactApplicationContext, map)
+      promise.resolve(true)
+    } catch (e: Throwable) {
+      promise.reject("INCOMING_CHAT_PERSIST_FAILED", e)
+    }
+  }
+
   @ReactMethod
   fun startIncomingChat(payload: ReadableMap, promise: Promise) {
     try {
@@ -75,19 +95,31 @@ class IncomingChatModule(
       promise.resolve(null)
       return
     }
-    val intent = activity.intent
-    if (intent == null || intent.action != IncomingChatService.ACTION_INCOMING_CHAT) {
-      Log.d(TAG, "consumeLaunchPayload: no incoming-chat intent (action=" +
-        (intent?.action ?: "null") + ")")
+    val intent = activity.intent ?: run {
       promise.resolve(null)
       return
     }
+    val decision = intent.getStringExtra("incomingChatDecision")
     val payload = readPayloadFromIntent(intent)
-    Log.d(TAG, "consumeLaunchPayload: returning payload to JS")
-    /** Clear the action so the same launch doesn't re-trigger after rotation / resume. */
+    val hasIncoming =
+      intent.action == IncomingChatService.ACTION_INCOMING_CHAT ||
+        decision != null ||
+        payload != null
+    if (!hasIncoming) {
+      Log.d(TAG, "consumeLaunchPayload: no incoming-chat intent (action=" +
+        intent.action + ")")
+      promise.resolve(null)
+      return
+    }
+    val map = payload ?: Arguments.createMap()
+    if (decision != null) {
+      map.putString("incomingChatDecision", decision)
+    }
+    Log.d(TAG, "consumeLaunchPayload: returning payload decision=" + (decision ?: ""))
+    intent.removeExtra("incomingChatDecision")
     intent.action = null
     activity.intent = intent
-    promise.resolve(payload)
+    promise.resolve(map)
   }
 
   @ReactMethod

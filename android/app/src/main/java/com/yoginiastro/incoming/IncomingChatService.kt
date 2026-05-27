@@ -54,8 +54,14 @@ class IncomingChatService : Service() {
     Log.d(TAG, "[2] handleStart roomId=" + payload["roomId"] +
       " from=" + payload["senderId"] + " name=" + payload["customerName"])
 
-    val callerName = payload["customerName"] ?: "Chat request"
-    val callerSubtitle = payload["subtitle"]?.takeIf { it.isNotBlank() }
+    IncomingChatPayloadStore.save(this, payload)
+
+    val callerName = payload["title"]?.takeIf { it.isNotBlank() }
+      ?: payload["customerName"]?.takeIf { it.isNotBlank() }
+      ?: "Chat request"
+    val callerSubtitle = payload["body"]?.takeIf { it.isNotBlank() }
+      ?: payload["message"]?.takeIf { it.isNotBlank() }
+      ?: payload["subtitle"]?.takeIf { it.isNotBlank() }
       ?: "User wants to chat"
 
     /**
@@ -150,7 +156,7 @@ class IncomingChatService : Service() {
     body: String,
     payload: HashMap<String, String>,
   ): Notification {
-    val launchActivityIntent = mainActivityIntent(payload)
+    val launchActivityIntent = fullScreenActivityIntent(payload)
 
     val contentPI = PendingIntent.getActivity(
       this,
@@ -198,18 +204,40 @@ class IncomingChatService : Service() {
       flags =
         Intent.FLAG_ACTIVITY_NEW_TASK or
           Intent.FLAG_ACTIVITY_CLEAR_TOP or
-          Intent.FLAG_ACTIVITY_SINGLE_TOP
+          Intent.FLAG_ACTIVITY_SINGLE_TOP or
+          Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+      payload.forEach { (k, v) -> putExtra(k, v) }
+    }
+  }
+
+  private fun fullScreenActivityIntent(payload: HashMap<String, String>): Intent {
+    return Intent(this, IncomingChatFullScreenActivity::class.java).apply {
+      flags =
+        Intent.FLAG_ACTIVITY_NEW_TASK or
+          Intent.FLAG_ACTIVITY_CLEAR_TOP or
+          Intent.FLAG_ACTIVITY_SINGLE_TOP or
+          Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
       payload.forEach { (k, v) -> putExtra(k, v) }
     }
   }
 
   private fun launchIncomingActivity(payload: HashMap<String, String>) {
+    /**
+     * Android 14+ / OnePlus: launching React MainActivity from background is often
+     * blocked. The native full-screen activity shows instantly; Accept opens MainActivity.
+     */
     try {
-      val intent = mainActivityIntent(payload)
+      val intent = fullScreenActivityIntent(payload)
       startActivity(intent)
-      Log.d(TAG, "[4] MainActivity startActivity OK from foreground service")
+      Log.d(TAG, "[4] IncomingChatFullScreenActivity startActivity OK")
     } catch (e: Throwable) {
-      Log.e(TAG, "[4] launchIncomingActivity FAILED", e)
+      Log.e(TAG, "[4] full-screen launch FAILED, trying MainActivity", e)
+      try {
+        startActivity(mainActivityIntent(payload))
+        Log.d(TAG, "[4] MainActivity fallback startActivity OK")
+      } catch (e2: Throwable) {
+        Log.e(TAG, "[4] MainActivity fallback FAILED", e2)
+      }
     }
   }
 

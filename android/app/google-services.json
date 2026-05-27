@@ -1,27 +1,94 @@
-
 {
   "project_info": {
-    "project_number": "996254120513",
-    "project_id": "ramanyoginitest",
-    "storage_bucket": "ramanyoginitest.firebasestorage.app"
+    "project_number": "655919665999",
+    "project_id": "yoginidev-f218f",
+    "storage_bucket": "yoginidev-f218f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:996254120513:android:5d55c512314c8ba4d1a4c0",
+        "mobilesdk_app_id": "1:655919665999:android:825390281b91df6c8f2b3a",
         "android_client_info": {
-          "package_name": "com.yoginiastro"
+          "package_name": "com.app.yoginiastro"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyBsa4MTzNz4XgxatpeYEAftNo6nT5F2JD4"
+          "current_key": "AIzaSyA2Ozyi_ubC5IKNx1Rlad-bKb_NdHOXqig"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:655919665999:android:d04c4d2ba450dc308f2b3a",
+        "android_client_info": {
+          "package_name": "com.app.yoginiastro.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2Ozyi_ubC5IKNx1Rlad-bKb_NdHOXqig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:655919665999:android:1d5a9c07b3b7045c8f2b3a",
+        "android_client_info": {
+          "package_name": "com.app.yoginiastrologer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2Ozyi_ubC5IKNx1Rlad-bKb_NdHOXqig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655919665999-1aj9hl109jjtik4ban2mrkgb7ji336fn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

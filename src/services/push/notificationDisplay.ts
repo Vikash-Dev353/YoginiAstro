@@ -7,7 +7,11 @@ import notifee, {
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
-import { getIncomingChatParamsFromData } from './incomingChatFromFcm';
+import {
+  getIncomingChatParamsFromData,
+  getIncomingChatParamsFromRemoteMessage,
+} from './incomingChatFromFcm';
+import { persistIncomingChatPayloadNative } from './incomingChatNative';
 import { setPendingIncomingChat } from './pendingIncomingChat';
 
 /** Matches native `NotificationChannels.SOUND_CHANNEL_ID` + FCM `channel_id: sound_channel`. */
@@ -81,6 +85,19 @@ export async function initializeLocalNotifications(): Promise<void> {
     }
     await ensureDefaultChannel();
     await ensureIncomingRingChannel();
+    if (Platform.OS === 'android') {
+      try {
+        const canFullScreen = await notifee.canUseFullScreenIntent();
+        fcmTrace('Android canUseFullScreenIntent=', canFullScreen);
+        if (!canFullScreen) {
+          fcmTrace(
+            'Enable full-screen notifications for Yogini Astro in system settings (required on Android 14 / OnePlus).',
+          );
+        }
+      } catch (fsError) {
+        fcmTraceError('canUseFullScreenIntent check failed', fsError);
+      }
+    }
     fcmTrace('notification channels ready');
   } catch (error) {
     fcmTraceError('initializeLocalNotifications failed', error);
@@ -113,16 +130,30 @@ function buildNotifeeDataPayload(
     if (value === undefined || value === null) continue;
     out[key] = typeof value === 'string' ? value : JSON.stringify(value);
   }
+  const title = getTitle(remoteMessage);
+  const body = getBody(remoteMessage);
+  if (title && !out.title) {
+    out.title = title;
+  }
+  if (body && !out.body) {
+    out.body = body;
+  }
   return out;
 }
+
+export type ShowLocalNotificationOptions = {
+  /** Native foreground service already plays the ring — only wake the activity. */
+  skipSound?: boolean;
+};
 
 /** Shows a local notification for data-only FCM payloads (background / killed). */
 export async function showLocalNotificationFromRemoteMessage(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+  options?: ShowLocalNotificationOptions,
 ): Promise<void> {
   const title = getTitle(remoteMessage);
   const body = getBody(remoteMessage);
-  const incomingParams = getIncomingChatParamsFromData(remoteMessage.data);
+  const incomingParams = getIncomingChatParamsFromRemoteMessage(remoteMessage);
   const isIncomingChat = incomingParams !== null;
 
   fcmTrace(
@@ -142,6 +173,7 @@ export async function showLocalNotificationFromRemoteMessage(
    * the notification body.
    */
   if (isIncomingChat && incomingParams) {
+    await persistIncomingChatPayloadNative(incomingParams);
     await setPendingIncomingChat(incomingParams);
   }
 
@@ -169,8 +201,8 @@ export async function showLocalNotificationFromRemoteMessage(
               category: AndroidCategory.CALL,
               visibility: AndroidVisibility.PUBLIC,
               importance: AndroidImportance.HIGH,
-              sound: INCOMING_RING_RES,
-              loopSound: true,
+              sound: options?.skipSound ? undefined : INCOMING_RING_RES,
+              loopSound: !options?.skipSound,
               ongoing: true,
               autoCancel: false,
               showTimestamp: true,
