@@ -412,11 +412,11 @@ function HomeScreenComponent({ navigation }: Props) {
               />
             </Pressable>
           </View>
-          <View style={styles.earningFooter}>
+           <View style={styles.earningFooter}>
             <Text style={styles.earningFooterText}>
               {t("home.invoiceHint")}
             </Text>
-          </View>
+          </View> 
         </View>
 
         <View style={styles.grid}>

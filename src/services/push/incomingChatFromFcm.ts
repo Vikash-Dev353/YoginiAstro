@@ -60,8 +60,26 @@ export function isIncomingChatPayload(
   if (EXPLICIT_NON_CHAT_TYPES.has(typeRaw) || EXPLICIT_NON_CHAT_TYPES.has(eventRaw)) {
     return false;
   }
+  // const navigateTo = normalizeEventLabel(data.navigateTo);
+  // if (navigateTo.includes('waitlist')) {
+  //   return false;
+  // }
+
   const navigateTo = normalizeEventLabel(data.navigateTo);
-  if (navigateTo.includes('waitlist')) {
+
+  /**
+   * Only block pure waitlist update notifications.
+   * Incoming chat notifications are ALSO routed to /waitlist
+   * so we must not reject them here.
+   */
+  const isExplicitWaitlistUpdate =
+    EXPLICIT_NON_CHAT_TYPES.has(typeRaw) ||
+    EXPLICIT_NON_CHAT_TYPES.has(eventRaw);
+
+  if (
+    isExplicitWaitlistUpdate &&
+    navigateTo.includes('waitlist')
+  ) {
     return false;
   }
 
@@ -122,11 +140,11 @@ export function applyIncomingChatFromFcm(
   const roomId = String(data.roomId ?? '').trim();
   const from = String(
     data.senderId ??
-      data.from ??
-      data.userId ??
-      data.customerId ??
-      data.mobile ??
-      '',
+    data.from ??
+    data.userId ??
+    data.customerId ??
+    data.mobile ??
+    '',
   ).trim();
   if (!roomId || !from) {
     fcmTrace(
@@ -268,11 +286,11 @@ export function getIncomingChatParamsFromRemoteMessage(
   const roomId = String(data.roomId ?? '').trim();
   const from = String(
     data.senderId ??
-      data.from ??
-      data.userId ??
-      data.customerId ??
-      data.mobile ??
-      '',
+    data.from ??
+    data.userId ??
+    data.customerId ??
+    data.mobile ??
+    '',
   ).trim();
   if (!roomId || !from) {
     return null;
