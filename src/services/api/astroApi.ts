@@ -439,6 +439,7 @@ export type UpdateProfileResponse = {
 export type AstroProfile = {
   astroId?: string;
   name?: string;
+  mobile?: string;
   gender?: string;
   languages?: string[] | string;
   skills?: string[] | string;
@@ -502,9 +503,120 @@ export type GetProfileResponse = {
   status?: string;
   message?: string;
   astrologer?: AstroProfile;
-  data?: AstroProfile;
+  data?: AstroProfile | Record<string, unknown>;
   profile?: AstroProfile;
+  result?: AstroProfile | Record<string, unknown>;
 };
+
+const optionalProfileString = (value: unknown): string | undefined => {
+  if (value == null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  return text.length > 0 ? text : undefined;
+};
+
+const isProfileLikeRecord = (value: Record<string, unknown>): boolean =>
+  Boolean(
+    value.name ||
+      value.astroId ||
+      value.astro_id ||
+      value.mobile ||
+      value.profileImage ||
+      value.profile_image,
+  );
+
+/** Normalizes mob/get-profile astrologer object (camelCase + snake_case). */
+export function normalizeAstroProfileFromApi(
+  raw: Record<string, unknown>,
+): AstroProfile {
+  return {
+    astroId: optionalProfileString(raw.astroId ?? raw.astro_id),
+    name: optionalProfileString(raw.name ?? raw.fullName),
+    mobile: optionalProfileString(raw.mobile),
+    gender: optionalProfileString(raw.gender),
+    languages: (raw.languages ?? raw.language) as AstroProfile['languages'],
+    skills: raw.skills as AstroProfile['skills'],
+    email: optionalProfileString(raw.email),
+    description: optionalProfileString(raw.description ?? raw.about),
+    experience: (raw.experience ?? raw.experienceYears) as AstroProfile['experience'],
+    price: raw.price as AstroProfile['price'],
+    callPrice: (raw.callPrice ?? raw.call_price) as AstroProfile['callPrice'],
+    dob: optionalProfileString(raw.dob ?? raw.dateOfBirth ?? raw.date_of_birth),
+    address: optionalProfileString(raw.address),
+    city: optionalProfileString(raw.city),
+    state: optionalProfileString(raw.state),
+    country: optionalProfileString(raw.country),
+    pincode: optionalProfileString(raw.pincode ?? raw.pin_code),
+    profileImage: optionalProfileString(
+      raw.profileImage ?? raw.profile_image ?? raw.profilePhoto ?? raw.profile_photo,
+    ),
+    aadhar: optionalProfileString(raw.aadhar ?? raw.aadhaar ?? raw.aadharCard),
+    pan: optionalProfileString(raw.pan ?? raw.panCard),
+    passBookOrCancelledCheque: optionalProfileString(
+      raw.passBookOrCancelledCheque ??
+        raw.passbook ??
+        raw.pass_book ??
+        raw.passBook,
+    ),
+    accountHolderName: optionalProfileString(
+      raw.accountHolderName ?? raw.account_holder_name,
+    ),
+    bankName: optionalProfileString(raw.bankName ?? raw.bank_name),
+    accountNumber: optionalProfileString(
+      raw.accountNumber ?? raw.account_number,
+    ),
+    ifscCode: optionalProfileString(raw.ifscCode ?? raw.ifsc_code),
+    speciality: (raw.speciality ??
+      raw.specialty ??
+      raw.specialities) as AstroProfile['speciality'],
+    isApproved: raw.isApproved as boolean | undefined,
+    adminApproved: raw.adminApproved as boolean | undefined,
+    approvalStatus: optionalProfileString(raw.approvalStatus ?? raw.approval_status),
+    accountStatus: optionalProfileString(raw.accountStatus ?? raw.account_status),
+    verified: raw.verified as boolean | undefined,
+  };
+};
+
+function unwrapProfileCandidate(
+  candidate: unknown,
+  depth = 0,
+): Record<string, unknown> | null {
+  if (depth > 6 || !candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return null;
+  }
+  const record = candidate as Record<string, unknown>;
+  if (isProfileLikeRecord(record)) {
+    return record;
+  }
+  const nested =
+    record.astrologer ?? record.profile ?? record.data ?? record.result;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return unwrapProfileCandidate(nested, depth + 1);
+  }
+  return null;
+}
+
+/** Extracts astrologer profile from get-profile API (handles nested keys). */
+export function getAstroProfileFromGetProfileResponse(
+  response: GetProfileResponse | Record<string, unknown>,
+): AstroProfile | undefined {
+  const root = response as GetProfileResponse & Record<string, unknown>;
+  const candidates: unknown[] = [
+    root.astrologer,
+    root.profile,
+    root.data,
+    root.result,
+    root,
+  ];
+  for (const candidate of candidates) {
+    const record = unwrapProfileCandidate(candidate);
+    if (record) {
+      return normalizeAstroProfileFromApi(record);
+    }
+  }
+  return undefined;
+}
 
 type WaitlistCacheEntry = {
   fetchedAt: number;
@@ -650,7 +762,7 @@ export const astroApi = {
     ),
   updateProfile: (payload: FormData) =>
     apiService.post<UpdateProfileResponse>(
-      'https://yoginiastro.com/api/mob/astro/update-profile',
+      API_ROUTES.auth.updateProfile,
       payload,
       {
         headers: {
@@ -660,9 +772,10 @@ export const astroApi = {
     ),
   submitInitialProfile: (payload: FormData) =>
     apiService.post<UpdateProfileResponse>(
-      'https://yoginiastro.com/api-v2/astrologer/initial-profile',
+      '/astrologer/initial-profile',
       payload,
       {
+        baseURL: 'https://yoginiastro.com/api-v2',
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -679,8 +792,7 @@ export const astroApi = {
       },
     ),
   getProfile: (payload: { astroId: string }) =>
-    apiService.post<GetProfileResponse>(
-      'https://yoginiastro.com/api/mob/astro/get-profile',
-      { astroId: payload.astroId.trim().toUpperCase() },
-    ),
+    apiService.post<GetProfileResponse>(API_ROUTES.auth.getProfile, {
+      astroId: payload.astroId.trim().toUpperCase(),
+    }),
 };

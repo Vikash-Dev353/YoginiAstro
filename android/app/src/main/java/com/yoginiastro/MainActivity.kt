@@ -46,6 +46,12 @@ class MainActivity : ReactActivity() {
    * immediately (do not wait for React Native to boot).
    */
   private fun maybeLaunchIncomingFullScreen(intent: Intent?) {
+    val decision = intent?.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
+    if (decision == "accept" || decision == "reject") {
+      /* Notification Answer/Decline — JS opens ConsultationChat via intent probe. */
+      return
+    }
+
     val fromIntent = IncomingChatPayloadStore.readFromIntent(intent)
     val payload = fromIntent ?: IncomingChatPayloadStore.load(this) ?: return
 

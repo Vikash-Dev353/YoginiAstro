@@ -25,6 +25,8 @@ export const translations = {
       reject: 'Reject',
       accept: 'Accept',
       noDataFound: 'No Data Found',
+      cancel: 'Cancel',
+      confirm: 'Confirm',
     },
     languageModal: {
       title: 'Change App Language',
@@ -91,6 +93,15 @@ export const translations = {
     profile: {
       astrologerProfile: 'Astrologer Profile',
       clearDataLogout: 'Clear Data & Logout',
+      clearDataLogoutConfirmTitle: 'Clear data & logout?',
+      clearDataLogoutConfirmMessage:
+        'This will clear your saved data and sign you out. Do you want to continue?',
+      edit: 'Edit',
+      editProfile: 'Edit Profile',
+      editProfileHeadline: 'Update your astrologer profile details',
+      updateProfile: 'Save Profile',
+      profileUpdatedTitle: 'Profile updated',
+      profileUpdatedMessage: 'Your profile has been updated successfully.',
       paySlip: 'Monthly Payout',
       downloadForm: 'Download Form 16A',
       termConditions: 'Term & Conditions',
@@ -220,6 +231,8 @@ export const translations = {
       reject: 'अस्वीकार',
       accept: 'स्वीकार',
       noDataFound: 'कोई डेटा नहीं मिला',
+      cancel: 'रद्द करें',
+      confirm: 'पुष्टि करें',
     },
     languageModal: {
       title: 'ऐप भाषा बदलें',
@@ -286,6 +299,15 @@ export const translations = {
     profile: {
       astrologerProfile: 'ज्योतिष प्रोफाइल',
       clearDataLogout: 'डेटा साफ करें और लॉगआउट',
+      clearDataLogoutConfirmTitle: 'डेटा साफ करें और लॉगआउट?',
+      clearDataLogoutConfirmMessage:
+        'इससे आपका सेव डेटा हटेगा और आप लॉगआउट हो जाएंगे। क्या आप जारी रखना चाहते हैं?',
+      edit: 'संपादित करें',
+      editProfile: 'प्रोफाइल संपादित करें',
+      editProfileHeadline: 'अपनी ज्योतिषी प्रोफाइल अपडेट करें',
+      updateProfile: 'प्रोफाइल सहेजें',
+      profileUpdatedTitle: 'प्रोफाइल अपडेट हुई',
+      profileUpdatedMessage: 'आपकी प्रोफाइल सफलतापूर्वक अपडेट हो गई है।',
       paySlip: 'मासिक भुगतान',
       downloadForm: 'फॉर्म 16A डाउनलोड करें',
       termConditions: 'नियम और शर्तें',
@@ -416,6 +438,8 @@ export type TranslationKey =
   | 'common.reject'
   | 'common.accept'
   | 'common.noDataFound'
+  | 'common.cancel'
+  | 'common.confirm'
   | 'languageModal.title'
   | 'languageModal.english'
   | 'languageModal.hindi'
@@ -466,6 +490,14 @@ export type TranslationKey =
   | 'auth.pendingApprovalRefresh'
   | 'profile.astrologerProfile'
   | 'profile.clearDataLogout'
+  | 'profile.clearDataLogoutConfirmTitle'
+  | 'profile.clearDataLogoutConfirmMessage'
+  | 'profile.edit'
+  | 'profile.editProfile'
+  | 'profile.editProfileHeadline'
+  | 'profile.updateProfile'
+  | 'profile.profileUpdatedTitle'
+  | 'profile.profileUpdatedMessage'
   | 'profile.paySlip'
   | 'profile.downloadForm'
   | 'profile.termConditions'

@@ -8,6 +8,10 @@ import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
+  resolveIncomingChatBody,
+  resolveIncomingChatTitle,
+} from './incomingChatDisplay';
+import {
   getIncomingChatParamsFromData,
   getIncomingChatParamsFromRemoteMessage,
 } from './incomingChatFromFcm';
@@ -144,6 +148,8 @@ function buildNotifeeDataPayload(
 export type ShowLocalNotificationOptions = {
   /** Native foreground service already plays the ring — only wake the activity. */
   skipSound?: boolean;
+  /** Native foreground service already shows Accept/Reject — skip duplicate Notifee UI. */
+  skipDisplay?: boolean;
 };
 
 /** Shows a local notification for data-only FCM payloads (background / killed). */
@@ -151,6 +157,12 @@ export async function showLocalNotificationFromRemoteMessage(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
   options?: ShowLocalNotificationOptions,
 ): Promise<void> {
+  if (options?.skipDisplay) {
+    fcmTrace(
+      'showLocalNotification skipped — native IncomingChatService owns notification UI',
+    );
+    return;
+  }
   const title = getTitle(remoteMessage);
   const body = getBody(remoteMessage);
   const incomingParams = getIncomingChatParamsFromRemoteMessage(remoteMessage);
@@ -183,11 +195,20 @@ export async function showLocalNotificationFromRemoteMessage(
       : await ensureDefaultChannel();
 
     const dataPayload = buildNotifeeDataPayload(remoteMessage);
+    const displayTitle = incomingParams
+      ? resolveIncomingChatTitle(incomingParams)
+      : title;
+    const displayBody = incomingParams
+      ? resolveIncomingChatBody({
+          ...incomingParams,
+          waitingCount: remoteMessage.data?.waitingCount,
+        })
+      : body;
 
     await notifee.displayNotification({
       id: remoteMessage.messageId || undefined,
-      title,
-      body,
+      title: displayTitle,
+      body: displayBody,
       data: dataPayload,
       android: {
         channelId,
@@ -221,15 +242,17 @@ export async function showLocalNotificationFromRemoteMessage(
               },
               actions: [
                 {
+                  title: 'Reject',
+                  icon: 'ic_notif_action_reject',
+                  pressAction: { id: 'incoming_chat_decline' },
+                },
+                {
                   title: 'Accept',
+                  icon: 'ic_notif_action_accept',
                   pressAction: {
                     id: 'incoming_chat_accept',
                     launchActivity: 'default',
                   },
-                },
-                {
-                  title: 'Reject',
-                  pressAction: { id: 'incoming_chat_decline' },
                 },
               ],
             }

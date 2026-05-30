@@ -100,7 +100,9 @@ class IncomingChatModule(
       return
     }
     val decision = intent.getStringExtra("incomingChatDecision")
-    val payload = readPayloadFromIntent(intent)
+    val fromIntent = IncomingChatPayloadStore.readFromIntent(intent)
+    val fromStore = IncomingChatPayloadStore.load(reactApplicationContext)
+    val payload = mergePayloadMaps(fromStore, fromIntent)
     val hasIncoming =
       intent.action == IncomingChatService.ACTION_INCOMING_CHAT ||
         decision != null ||
@@ -150,23 +152,36 @@ class IncomingChatModule(
     if (intent.action != IncomingChatService.ACTION_INCOMING_CHAT) {
       return
     }
-    val payload = readPayloadFromIntent(intent) ?: return
-    Log.d(TAG, "onNewIntent → emitting $EVENT_INCOMING_CHAT to JS")
+    val decision = intent.getStringExtra("incomingChatDecision")
+    val payload = mergePayloadMaps(
+      IncomingChatPayloadStore.load(reactApplicationContext),
+      IncomingChatPayloadStore.readFromIntent(intent),
+    ) ?: return
+    if (decision != null) {
+      payload.putString("incomingChatDecision", decision)
+    }
+    Log.d(
+      TAG,
+      "onNewIntent → emitting $EVENT_INCOMING_CHAT decision=" + (decision ?: ""),
+    )
     reactContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       ?.emit(EVENT_INCOMING_CHAT, payload)
   }
 
-  private fun readPayloadFromIntent(intent: Intent): WritableMap? {
-    val extras = intent.extras ?: return null
-    val map = Arguments.createMap()
-    var hasAny = false
-    for (key in extras.keySet()) {
-      val v = extras.getString(key) ?: continue
-      map.putString(key, v)
-      hasAny = true
+  private fun mergePayloadMaps(
+    store: HashMap<String, String>?,
+    intent: HashMap<String, String>?,
+  ): WritableMap? {
+    val merged = HashMap<String, String>()
+    store?.forEach { (k, v) -> merged[k] = v }
+    intent?.forEach { (k, v) -> merged[k] = v }
+    if (merged.isEmpty()) {
+      return null
     }
-    return if (hasAny) map else null
+    val map = Arguments.createMap()
+    merged.forEach { (k, v) -> map.putString(k, v) }
+    return map
   }
 
   companion object {

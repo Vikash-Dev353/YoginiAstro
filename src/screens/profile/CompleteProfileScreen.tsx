@@ -1,11 +1,11 @@
-import { CommonActions } from '@react-navigation/native';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import {
   Alert,
   FlatList,
@@ -20,23 +20,41 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { images } from '../../assets/images';
 import { AppButton } from '../../components/common/AppButton';
+import { AppHeader } from '../../components/common/AppHeader';
 import { AppInput } from '../../components/common/AppInput';
+import { AppLoader } from '../../components/common/AppLoader';
+import { PhotoSourcePickerModal } from '../../components/common/PhotoSourcePickerModal';
 import { colors } from '../../constants/colors';
 import { useTranslation } from '../../localization/useTranslation';
-import { AuthStackParamList } from '../../navigation/types';
-import { astroApi, type AstroProfile } from '../../services/api/astroApi';
+import { AuthStackParamList, ProfileStackParamList } from '../../navigation/types';
+import {
+  astroApi,
+  getAstroProfileFromGetProfileResponse,
+  type AstroProfile,
+} from '../../services/api/astroApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   applyAuthGate,
   decodeMobileFromToken,
   logout,
 } from '../../store/slices/authSlice';
+import {
+  pickPhotoFromCamera,
+  pickPhotoFromGallery,
+  runAfterModalDismiss,
+  type PickedImage,
+} from '../../utils/photoPicker';
 import { hp, normalizeFont, wp } from '../../utils/responsive';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'CompleteProfile'>;
+type Props =
+  | NativeStackScreenProps<AuthStackParamList, 'CompleteProfile'>
+  | NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
 
 const HEADER_BG = '#3B1616';
 const CREAM = '#FFF9F2';
@@ -51,6 +69,7 @@ const SKILL_OPTIONS: { value: string; label: string }[] = [
   { value: 'kp', label: 'KP' },
   { value: 'prashna', label: 'Prashna' },
   { value: 'remedies', label: 'Remedies' },
+  { value: 'palmistry', label: 'Palmistry' },
 ];
 
 const SPECIALITY_OPTIONS: { value: string; label: string }[] = [
@@ -94,6 +113,13 @@ const parseApiDob = (dobValue?: string) => {
   const normalized = dobValue.trim();
   if (!normalized) {
     return null;
+  }
+
+  if (normalized.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(normalized)) {
+    const isoDate = new Date(normalized);
+    if (!Number.isNaN(isoDate.getTime())) {
+      return isoDate;
+    }
   }
 
   const parts = normalized.includes('-')
@@ -143,31 +169,72 @@ const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_NUMBER_REGEX = /^\d{9,18}$/;
 const ACCOUNT_HOLDER_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
 
+type LocalImageRef = string | PickedImage | null | undefined;
+
+const resolveLocalImage = (
+  ref: LocalImageRef,
+): { uri: string; fileName: string; type: string } | null => {
+  if (!ref) {
+    return null;
+  }
+  if (typeof ref === 'string') {
+    const trimmed = ref.trim();
+    if (!trimmed || trimmed.toLowerCase().startsWith('http')) {
+      return null;
+    }
+    const fileName = trimmed.split('/').pop() || `image-${Date.now()}.jpg`;
+    return { uri: trimmed, fileName, type: 'image/jpeg' };
+  }
+  const trimmed = ref.uri?.trim();
+  if (!trimmed || trimmed.toLowerCase().startsWith('http')) {
+    return null;
+  }
+  return {
+    uri: trimmed,
+    fileName: ref.fileName,
+    type: ref.type,
+  };
+};
+
 const appendLocalImageToFormData = (
   formData: FormData,
   fieldName: string,
-  uri: string | null | undefined,
+  ref: LocalImageRef,
 ) => {
-  const trimmed = uri?.trim();
-  if (!trimmed || trimmed.toLowerCase().startsWith('http')) {
+  const file = resolveLocalImage(ref);
+  if (!file) {
     return;
   }
-  const fileName = trimmed.split('/').pop() || `${fieldName}-${Date.now()}.jpg`;
-  formData.append(
-    fieldName,
-    {
-      uri: trimmed,
-      name: fileName,
-      type: 'image/jpeg',
-    } as never,
-  );
+  formData.append(fieldName, {
+    uri: file.uri,
+    name: file.fileName,
+    type: file.type,
+  } as never);
 };
 
-const hasDocumentUri = (uri: string | null | undefined) => Boolean(uri?.trim());
+const hasDocumentUri = (ref: LocalImageRef) => {
+  if (!ref) {
+    return false;
+  }
+  if (typeof ref === 'string') {
+    return Boolean(ref.trim());
+  }
+  return Boolean(ref.uri?.trim());
+};
+
+const displayImageUri = (ref: LocalImageRef): string | null => {
+  if (!ref) {
+    return null;
+  }
+  if (typeof ref === 'string') {
+    return ref;
+  }
+  return ref.uri;
+};
 
 type DocumentUploadFieldProps = {
   label: string;
-  imageUri: string | null;
+  imageUri: LocalImageRef;
   onPressUpload: () => void;
   photoSelectedLabel: string;
 };
@@ -178,6 +245,7 @@ const DocumentUploadField = memo(function DocumentUploadField({
   onPressUpload,
   photoSelectedLabel,
 }: DocumentUploadFieldProps) {
+  const previewUri = displayImageUri(imageUri);
   return (
     <View style={docUploadStyles.wrap}>
       <Text style={docUploadStyles.label}>
@@ -190,13 +258,13 @@ const DocumentUploadField = memo(function DocumentUploadField({
         accessibilityRole="button"
         accessibilityLabel={label}
       >
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={docUploadStyles.preview} />
+        {previewUri ? (
+          <Image source={{ uri: previewUri }} style={docUploadStyles.preview} />
         ) : (
           <Text style={docUploadStyles.uploadHint}>📷 {label}</Text>
         )}
       </Pressable>
-      {imageUri ? (
+      {previewUri ? (
         <Text style={docUploadStyles.selectedText}>{photoSelectedLabel}</Text>
       ) : null}
     </View>
@@ -226,25 +294,75 @@ function tokenizeProfileListField(
   return s.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 }
 
-function mapSkillTokensToValues(tokens: string[]): string[] {
-  const out = new Set<string>();
-  for (const t of tokens) {
-    const tl = t.toLowerCase();
-    const byVal = SKILL_OPTIONS.find(
-      o => o.value === t || o.value.toLowerCase() === tl,
-    );
-    if (byVal) {
-      out.add(byVal.value);
+function skillApiTokenToValue(token: string): string | null {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const tl = trimmed.toLowerCase();
+  const byVal = SKILL_OPTIONS.find(
+    o => o.value === trimmed || o.value.toLowerCase() === tl,
+  );
+  if (byVal) {
+    return byVal.value;
+  }
+  const byLabel = SKILL_OPTIONS.find(
+    o => o.label.toLowerCase() === tl || o.label === trimmed,
+  );
+  if (byLabel) {
+    return byLabel.value;
+  }
+  const byPartial = SKILL_OPTIONS.find(
+    o =>
+      tl.includes(o.value) ||
+      tl.includes(o.label.toLowerCase()) ||
+      o.label.toLowerCase().includes(tl),
+  );
+  if (byPartial) {
+    return byPartial.value;
+  }
+  if (tl.includes('tarot') || tl.includes('tarrot')) {
+    return 'tarot';
+  }
+  if (tl.includes('palm')) {
+    return 'palmistry';
+  }
+  if (tl.includes('vedic')) {
+    return 'vedic';
+  }
+  if (tl.includes('prashna')) {
+    return 'prashna';
+  }
+  if (tl.includes('remed')) {
+    return 'remedies';
+  }
+  if (tl.includes('kp')) {
+    return 'kp';
+  }
+  return null;
+}
+
+function resolveSkillsFromApi(tokens: string[]): {
+  selected: string[];
+  extras: { value: string; label: string }[];
+} {
+  const selected = new Set<string>();
+  const extras: { value: string; label: string }[] = [];
+  for (const token of tokens) {
+    const mapped = skillApiTokenToValue(token);
+    if (mapped) {
+      selected.add(mapped);
       continue;
     }
-    const byLabel = SKILL_OPTIONS.find(
-      o => o.label.toLowerCase() === tl || o.label === t,
-    );
-    if (byLabel) {
-      out.add(byLabel.value);
-    }
+    const value = `api:${token.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    selected.add(value);
+    extras.push({ value, label: token.trim() });
   }
-  return Array.from(out);
+  return { selected: Array.from(selected), extras };
+}
+
+function mapSkillTokensToValues(tokens: string[]): string[] {
+  return resolveSkillsFromApi(tokens).selected;
 }
 
 function mapSpecialityTokensToValues(tokens: string[]): string[] {
@@ -273,6 +391,42 @@ const languagesValuesToJsonPayload = (values: string[]) => {
   const list = values.length ? values : ['Hindi'];
   return JSON.stringify(list);
 };
+
+/** mob/astro/update-profile — `"Vedic","Palmistry"` */
+function skillLabelForUpdatePayload(
+  value: string,
+  skillOptions: { value: string; label: string }[],
+): string {
+  const option = skillOptions.find(o => o.value === value);
+  if (option) {
+    return option.label;
+  }
+  if (value.startsWith('api:')) {
+    return value
+      .slice(4)
+      .split('-')
+      .filter(Boolean)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+  return value;
+}
+
+function skillsValuesToUpdatePayload(
+  values: string[],
+  skillOptions: { value: string; label: string }[],
+): string {
+  const labels = values.map(v => skillLabelForUpdatePayload(v, skillOptions));
+  return `"${labels.join('","')}"`;
+}
+
+/** mob/astro/update-profile — `"Hindi","English"` */
+function languagesValuesToUpdatePayload(values: string[]): string {
+  const labels = values.map(
+    v => LANGUAGE_OPTIONS.find(o => o.value === v)?.label ?? v,
+  );
+  return `"${labels.join('","')}"`;
+}
 
 function mapLanguageTokensToValues(tokens: string[]): string[] {
   const allowed = new Set(LANGUAGE_OPTIONS.map(o => o.value));
@@ -412,18 +566,23 @@ function MultiSelectModal({
   );
 }
 
-function CompleteProfileScreenComponent({ navigation }: Props) {
+function CompleteProfileScreenComponent({ navigation, route }: Props) {
   const { t } = useTranslation();
+  const isEditMode = route.name === 'EditProfile';
+  /** Auth `CompleteProfile` has no tab bar; Profile `EditProfile` does. */
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const astroId = useAppSelector(state => state.auth.astroId)?.trim() || '';
   const token = useAppSelector(state => state.auth.token);
   const userEmail = useAppSelector(state => state.auth.user?.email)?.trim() || '';
 
   const [fullName, setFullName] = useState('');
-  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
-  const [aadharImageUri, setAadharImageUri] = useState<string | null>(null);
-  const [panImageUri, setPanImageUri] = useState<string | null>(null);
-  const [passBookImageUri, setPassBookImageUri] = useState<string | null>(null);
+  const [profileMobile, setProfileMobile] = useState('');
+  const [profileImageUri, setProfileImageUri] = useState<LocalImageRef>(null);
+  const [aadharImageUri, setAadharImageUri] = useState<LocalImageRef>(null);
+  const [panImageUri, setPanImageUri] = useState<LocalImageRef>(null);
+  const [passBookImageUri, setPassBookImageUri] = useState<LocalImageRef>(null);
   const [accountHolderName, setAccountHolderName] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -434,6 +593,9 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
   const [isDobPickerVisible, setIsDobPickerVisible] = useState(false);
   const [tempDobDate, setTempDobDate] = useState(new Date(1990, 0, 1));
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [apiSkillOptions, setApiSkillOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
   const [experience, setExperience] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
@@ -450,6 +612,7 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
   const [isLoadingStates, setIsLoadingStates] = useState(false);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [hasLoadedProfile, setHasLoadedProfile] = useState(!isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [modal, setModal] = useState<{
@@ -462,10 +625,26 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
       | 'state'
       | null;
   }>({ kind: null });
+  const [photoPicker, setPhotoPicker] = useState<{
+    title: string;
+    onSelect: (image: LocalImageRef) => void;
+  } | null>(null);
+
+  const normalizeGenderLabel = useCallback((value?: string) => {
+    const trimmed = value?.trim();
+    if (!trimmed) {
+      return '';
+    }
+    const match = GENDER_OPTIONS.find(
+      option => option.toLowerCase() === trimmed.toLowerCase(),
+    );
+    return match ?? trimmed;
+  }, []);
 
   const applyProfileData = useCallback((profile: AstroProfile) => {
     setFullName(profile.name?.trim() || '');
-    setGender(profile.gender?.trim() || '');
+    setProfileMobile(profile.mobile?.trim() || '');
+    setGender(normalizeGenderLabel(profile.gender));
     setAddress(profile.address?.trim() || '');
     setDescription(
       typeof profile.description === 'string' ? profile.description.trim() : '',
@@ -487,7 +666,9 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     setSelectedLanguages(mapLanguageTokensToValues(langTokens));
 
     const skillTokens = tokenizeProfileListField(profile.skills);
-    setSelectedSkills(mapSkillTokensToValues(skillTokens));
+    const resolvedSkills = resolveSkillsFromApi(skillTokens);
+    setSelectedSkills(resolvedSkills.selected);
+    setApiSkillOptions(resolvedSkills.extras);
 
     if (profile.profileImage?.trim()) {
       setProfileImageUri(profile.profileImage.trim());
@@ -511,25 +692,41 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
       setDobDate(parsedDob);
       setDob(formatDateAsDdMmYy(parsedDob));
     }
-  }, []);
+  }, [normalizeGenderLabel]);
 
   const fetchAstroProfile = useCallback(async () => {
     if (!astroId) {
+      if (isEditMode) {
+        Alert.alert('Error', 'Astro ID not found. Please login again.');
+      }
+      setHasLoadedProfile(true);
       return;
     }
     try {
       setIsLoadingProfile(true);
       const response = await astroApi.getProfile({ astroId });
-      const profile = response.astrologer || response.data || response.profile;
+      const profile = getAstroProfileFromGetProfileResponse(response);
       if (profile) {
         applyProfileData(profile);
+      } else if (isEditMode) {
+        Alert.alert(
+          'Error',
+          response.message || 'Unable to load profile data.',
+        );
       }
-    } catch {
-      // Keep form usable with current values when fetch fails.
+    } catch (error) {
+      if (isEditMode) {
+        Alert.alert(
+          'Error',
+          (error as { message?: string })?.message ||
+            'Unable to load profile. Please try again.',
+        );
+      }
     } finally {
       setIsLoadingProfile(false);
+      setHasLoadedProfile(true);
     }
-  }, [applyProfileData, astroId]);
+  }, [applyProfileData, astroId, isEditMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -604,8 +801,20 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
   }, [country, stateName]);
 
   useEffect(() => {
-    fetchAstroProfile();
-  }, [fetchAstroProfile]);
+    if (!isEditMode) {
+      void fetchAstroProfile();
+    }
+  }, [fetchAstroProfile, isEditMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isEditMode) {
+        return;
+      }
+      setHasLoadedProfile(false);
+      void fetchAstroProfile();
+    }, [fetchAstroProfile, isEditMode]),
+  );
 
   const modalConfig = useMemo(() => {
     switch (modal.kind) {
@@ -635,12 +844,21 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     }
   }, [cityOptions, modal.kind, t]);
 
+  const skillOptions = useMemo(
+    () => [...SKILL_OPTIONS, ...apiSkillOptions],
+    [apiSkillOptions],
+  );
+
   const skillsSummary = useMemo(
     () =>
       selectedSkills
-        .map(v => SKILL_OPTIONS.find(o => o.value === v)?.label ?? v)
+        .map(
+          v =>
+            skillOptions.find(o => o.value === v)?.label ??
+            v.replace(/^api:/, ''),
+        )
         .join(', '),
-    [selectedSkills],
+    [selectedSkills, skillOptions],
   );
 
   const specialitySummary = useMemo(
@@ -711,7 +929,10 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
       Alert.alert('Error', 'Please enter a valid 6-digit pincode.');
       return;
     }
-    if (!stateName.trim() || !city.trim()) {
+    if (
+      !isEditMode &&
+      (!stateName.trim() || !city.trim())
+    ) {
       Alert.alert('Error', 'Please select state and city.');
       return;
     }
@@ -758,6 +979,7 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     }
 
     const mobile =
+      profileMobile ||
       decodeMobileFromToken(token) ||
       userEmail.match(/^(\d{10})@/)?.[1] ||
       '';
@@ -767,28 +989,55 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     }
 
     const payload = new FormData();
-    payload.append('name', fullName.trim());
-    payload.append('gender', gender || 'Male');
-    payload.append('dob', formatDateAsYyyyMmDd(dobDate));
-    payload.append('skills', skillsValuesToJsonPayload(selectedSkills));
-    payload.append('languages', languagesValuesToJsonPayload(selectedLanguages));
-    payload.append('address', address.trim());
-    payload.append('pincode', pincode.trim());
-    payload.append('mobile', mobile);
-    payload.append('description', description.trim() || '—');
-    payload.append('email', userEmail.trim() || 'test@gmail.com');
-    payload.append('experience', experience.trim() || '0');
-    payload.append(
-      'speciality',
-      specialityValuesToJsonPayload(selectedSpecialities),
-    );
-    payload.append('country', 'IN');
-    payload.append('state', stateName.trim());
-    payload.append('city', city.trim());
-    payload.append('accountHolderName', holderName);
-    payload.append('bankName', bank);
-    payload.append('accountNumber', accountNo);
-    payload.append('ifscCode', ifsc);
+
+    if (isEditMode) {
+      payload.append('name', fullName.trim());
+      payload.append('mobile', mobile);
+      payload.append('gender', gender || 'Male');
+      payload.append('dob', formatDateAsYyyyMmDd(dobDate));
+      payload.append(
+        'skills',
+        skillsValuesToUpdatePayload(selectedSkills, skillOptions),
+      );
+      payload.append(
+        'languages',
+        languagesValuesToUpdatePayload(selectedLanguages),
+      );
+      payload.append('address', address.trim());
+      payload.append('pincode', pincode.trim());
+      payload.append(
+        'speciality',
+        specialityValuesToJsonPayload(selectedSpecialities),
+      );
+      payload.append('accountHolderName', holderName);
+      payload.append('bankName', bank);
+      payload.append('accountNumber', accountNo);
+      payload.append('ifscCode', ifsc);
+      payload.append('astroId', astroId.trim().toUpperCase());
+    } else {
+      payload.append('name', fullName.trim());
+      payload.append('gender', gender || 'Male');
+      payload.append('dob', formatDateAsYyyyMmDd(dobDate));
+      payload.append('skills', skillsValuesToJsonPayload(selectedSkills));
+      payload.append('languages', languagesValuesToJsonPayload(selectedLanguages));
+      payload.append('address', address.trim());
+      payload.append('pincode', pincode.trim());
+      payload.append('mobile', mobile);
+      payload.append('description', description.trim() || '—');
+      payload.append('email', userEmail.trim() || 'test@gmail.com');
+      payload.append('experience', experience.trim() || '0');
+      payload.append(
+        'speciality',
+        specialityValuesToJsonPayload(selectedSpecialities),
+      );
+      payload.append('country', 'IN');
+      payload.append('state', stateName.trim());
+      payload.append('city', city.trim());
+      payload.append('accountHolderName', holderName);
+      payload.append('bankName', bank);
+      payload.append('accountNumber', accountNo);
+      payload.append('ifscCode', ifsc);
+    }
 
     appendLocalImageToFormData(payload, 'profileImage', profileImageUri);
     appendLocalImageToFormData(payload, 'aadhar', aadharImageUri);
@@ -801,9 +1050,20 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
 
     try {
       setIsSubmitting(true);
-      const response = await astroApi.submitInitialProfile(payload);
+      const response = isEditMode
+        ? await astroApi.updateProfile(payload)
+        : await astroApi.submitInitialProfile(payload);
       const success = response.status?.toLowerCase() === 'success';
-      if (success) {
+      if (success && isEditMode) {
+        await fetchAstroProfile();
+        Alert.alert(
+          t('profile.profileUpdatedTitle'),
+          response.message || t('profile.profileUpdatedMessage'),
+          [{ text: 'OK', onPress: () => navigation.goBack() }],
+        );
+        return;
+      }
+      if (success && !isEditMode) {
         await fetchAstroProfile();
         await dispatch(
           applyAuthGate({
@@ -811,7 +1071,11 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
             pendingAdminApproval: true,
           }),
         ).unwrap();
-        navigation.replace('PendingApproval');
+        const authNavigation = navigation as NativeStackScreenProps<
+          AuthStackParamList,
+          'CompleteProfile'
+        >['navigation'];
+        authNavigation.replace('PendingApproval');
       }
       Alert.alert(
         success ? t('completeProfile.submitTitle') : 'Update failed',
@@ -843,14 +1107,17 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     panImageUri,
     passBookImageUri,
     pincode,
+    profileMobile,
     profileImageUri,
     selectedSkills,
+    skillOptions,
     selectedSpecialities,
     stateName,
     t,
     token,
     userEmail,
     fetchAstroProfile,
+    isEditMode,
     navigation,
     dispatch,
   ]);
@@ -870,54 +1137,49 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
   }, [dispatch, navigation]);
 
   const closeModal = useCallback(() => setModal({ kind: null }), []);
-  const pickImageFromSource = useCallback(
-    async (
-      source: 'camera' | 'gallery',
-      onUriSelected: (uri: string) => void,
-    ) => {
-      try {
-        const result =
-          source === 'camera'
-            ? await launchCamera({
-                mediaType: 'photo',
-                cameraType: 'back',
-                quality: 0.9,
-              })
-            : await launchImageLibrary({
-                mediaType: 'photo',
-                quality: 0.9,
-                selectionLimit: 1,
-              });
-        if (result.didCancel || result.errorCode) {
-          return;
-        }
-        const selectedUri = result.assets?.[0]?.uri;
-        if (selectedUri) {
-          onUriSelected(selectedUri);
-        }
-      } catch {
-        Alert.alert('Error', 'Unable to pick image');
-      }
+
+  const closePhotoPicker = useCallback(() => {
+    setPhotoPicker(null);
+  }, []);
+
+  const openDocumentPicker = useCallback(
+    (title: string, onImageSelected: (image: LocalImageRef) => void) => {
+      setPhotoPicker({ title, onSelect: onImageSelected });
     },
     [],
   );
 
-  const openDocumentPicker = useCallback(
-    (title: string, onUriSelected: (uri: string) => void) => {
-      Alert.alert(title, t('completeProfile.choosePhotoSource'), [
-        {
-          text: t('completeProfile.camera'),
-          onPress: () => pickImageFromSource('camera', onUriSelected),
-        },
-        {
-          text: t('completeProfile.gallery'),
-          onPress: () => pickImageFromSource('gallery', onUriSelected),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    },
-    [pickImageFromSource, t],
-  );
+  const onPhotoPickerCamera = useCallback(() => {
+    const picker = photoPicker;
+    closePhotoPicker();
+    if (!picker) {
+      return;
+    }
+    runAfterModalDismiss(() => {
+      void (async () => {
+        const picked = await pickPhotoFromCamera();
+        if (picked) {
+          picker.onSelect(picked);
+        }
+      })();
+    });
+  }, [closePhotoPicker, photoPicker]);
+
+  const onPhotoPickerGallery = useCallback(() => {
+    const picker = photoPicker;
+    closePhotoPicker();
+    if (!picker) {
+      return;
+    }
+    runAfterModalDismiss(() => {
+      void (async () => {
+        const picked = await pickPhotoFromGallery();
+        if (picked) {
+          picker.onSelect(picked);
+        }
+      })();
+    });
+  }, [closePhotoPicker, photoPicker]);
 
   const onUploadProfilePhoto = useCallback(() => {
     openDocumentPicker(t('completeProfile.uploadPhoto'), setProfileImageUri);
@@ -964,8 +1226,27 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
     setIsDobPickerVisible(false);
   }, [tempDobDate]);
 
+  const fallbackTabBarHeight = 72;
+  const effectiveTabBarHeight =
+    tabBarHeight > 0 ? tabBarHeight : fallbackTabBarHeight;
+  const editScrollBottomPadding =
+    effectiveTabBarHeight + insets.bottom + 48;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={styles.safe}
+      edges={isEditMode ? ['bottom', 'left', 'right'] : ['top', 'left', 'right']}
+    >
+      {isEditMode ? (
+        <AppHeader
+          title={t('profile.editProfile')}
+          showBack
+          onBackPress={() => navigation.goBack()}
+        />
+      ) : null}
+      {isEditMode && (isLoadingProfile || !hasLoadedProfile) ? (
+        <AppLoader />
+      ) : (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
@@ -974,37 +1255,46 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
           bounces={false}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isEditMode && { paddingBottom: editScrollBottomPadding },
+          ]}
         >
-          <View style={styles.header}>
-            <ImageBackground
-              source={images.appBackground}
-              style={StyleSheet.absoluteFill}
-              imageStyle={styles.headerPattern}
-            />
-            <View style={styles.headerOverlay} />
-            <Text style={styles.headline}>{t('completeProfile.headline')}</Text>
+          {isEditMode ? (
+            <Text style={styles.editHeadline}>{t('profile.editProfileHeadline')}</Text>
+          ) : (
+            <View style={styles.header}>
+              <ImageBackground
+                source={images.appBackground}
+                style={StyleSheet.absoluteFill}
+                imageStyle={styles.headerPattern}
+              />
+              <View style={styles.headerOverlay} />
+              <Text style={styles.headline}>{t('completeProfile.headline')}</Text>
 
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatarRing}>
-                <Image
-                  source={
-                    profileImageUri ? { uri: profileImageUri } : images.logo
-                  }
-                  style={styles.avatarImg}
-                  resizeMode={profileImageUri ? 'cover' : 'contain'}
-                />
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatarRing}>
+                  <Image
+                    source={
+                      displayImageUri(profileImageUri)
+                        ? { uri: displayImageUri(profileImageUri)! }
+                        : images.logo
+                    }
+                    style={styles.avatarImg}
+                    resizeMode={displayImageUri(profileImageUri) ? 'cover' : 'contain'}
+                  />
+                </View>
+                <Pressable
+                  style={styles.cameraBadge}
+                  onPress={onUploadProfilePhoto}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('completeProfile.uploadPhoto')}
+                >
+                  <Text style={styles.cameraIcon}>📷</Text>
+                </Pressable>
               </View>
-              <Pressable
-                style={styles.cameraBadge}
-                onPress={onUploadProfilePhoto}
-                accessibilityRole="button"
-                accessibilityLabel={t('completeProfile.uploadPhoto')}
-              >
-                <Text style={styles.cameraIcon}>📷</Text>
-              </Pressable>
             </View>
-          </View>
+          )}
 
           <View style={styles.card}>
             <Text style={styles.uploadLabel}>
@@ -1349,27 +1639,41 @@ function CompleteProfileScreenComponent({ navigation }: Props) {
             />
 
             <AppButton
-              title={t('completeProfile.submitRegistration')}
-              
+              title={
+                isEditMode
+                  ? t('profile.updateProfile')
+                  : t('completeProfile.submitRegistration')
+              }
               onPress={onSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
+              loading={isSubmitting || isLoadingProfile}
+              disabled={isSubmitting || isLoadingProfile}
               containerStyle={styles.submitBtn}
             />
 
-            <Pressable onPress={onReturnToLogin} style={styles.loginLinkWrap}>
-              <Text style={styles.loginLink}>
-                {t('completeProfile.returnToLogin')}
-              </Text>
-            </Pressable>
+            {!isEditMode ? (
+              <Pressable onPress={onReturnToLogin} style={styles.loginLinkWrap}>
+                <Text style={styles.loginLink}>
+                  {t('completeProfile.returnToLogin')}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      )}
+
+      <PhotoSourcePickerModal
+        visible={photoPicker != null}
+        title={photoPicker?.title ?? ''}
+        onClose={closePhotoPicker}
+        onCamera={onPhotoPickerCamera}
+        onGallery={onPhotoPickerGallery}
+      />
 
       <MultiSelectModal
         visible={modal.kind === 'skills'}
         title={t('completeProfile.selectSkills')}
-        options={SKILL_OPTIONS}
+        options={skillOptions}
         selectedValues={selectedSkills}
         onToggleValue={toggleSkillValue}
         onClose={closeModal}
@@ -1543,6 +1847,16 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     zIndex: 1,
     paddingHorizontal: wp(4),
+  },
+  editHeadline: {
+    textAlign: 'center',
+    color: LABEL_BROWN,
+    fontSize: normalizeFont(16),
+    lineHeight: 22,
+    fontWeight: '600',
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1.5),
+    paddingBottom: hp(1),
   },
   avatarWrap: {
     position: 'absolute',

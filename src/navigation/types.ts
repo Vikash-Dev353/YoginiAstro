@@ -55,6 +55,7 @@ export type OrderStackParamList = {
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
+  EditProfile: undefined;
   CustomerSupport: undefined;
   GoLiveNow: undefined;
   ComingSoon:

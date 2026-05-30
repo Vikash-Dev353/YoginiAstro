@@ -9,6 +9,10 @@ import {
   type GenerateKundaliPayload,
 } from '../api/astroApi';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
+import {
+  resolveIncomingChatBody,
+  resolveIncomingChatTitle,
+} from './incomingChatDisplay';
 
 /** If user tapped a waitlist notification before login, open Waitlist after session is ready. */
 let pendingWaitlistMessage: FirebaseMessagingTypes.RemoteMessage | null = null;
@@ -300,12 +304,45 @@ export function getIncomingChatParamsFromRemoteMessage(
     String(data.customerName ?? data.userName ?? data.senderName ?? '').trim() ||
     'Unknown User';
 
-  const notificationTitle = String(
-    remoteMessage.notification?.title ?? data.title ?? data.notificationTitle ?? '',
-  ).trim();
-  const notificationBody = String(
-    remoteMessage.notification?.body ?? data.body ?? data.notificationBody ?? '',
-  ).trim();
+  const waitingCountRaw = data.waitingCount ?? data.waiting_count;
+  const waitingCount =
+    waitingCountRaw !== undefined && waitingCountRaw !== ''
+      ? String(waitingCountRaw)
+      : undefined;
+
+  const notificationTitle = resolveIncomingChatTitle({
+    customerName,
+    notificationTitle: String(
+      remoteMessage.notification?.title ??
+        data.title ??
+        data.notificationTitle ??
+        '',
+    ).trim() || undefined,
+    notificationBody: undefined,
+    message: data.message ? String(data.message) : undefined,
+    subtitle:
+      data.subtitle ?? data.roleLabel
+        ? String(data.subtitle ?? data.roleLabel).trim()
+        : undefined,
+    waitingCount,
+  });
+
+  const notificationBody = resolveIncomingChatBody({
+    customerName,
+    notificationTitle,
+    notificationBody: String(
+      remoteMessage.notification?.body ??
+        data.body ??
+        data.notificationBody ??
+        '',
+    ).trim() || undefined,
+    message: data.message ? String(data.message) : undefined,
+    subtitle:
+      data.subtitle ?? data.roleLabel
+        ? String(data.subtitle ?? data.roleLabel).trim()
+        : undefined,
+    waitingCount,
+  });
 
   const profileImage = String(
     data.customerImage ?? data.profileImage ?? data.senderImage ?? '',
@@ -353,8 +390,8 @@ export function getIncomingChatParamsFromRemoteMessage(
     from,
     customerName,
     customerImage: profileImage || null,
-    notificationTitle: notificationTitle || undefined,
-    notificationBody: notificationBody || undefined,
+    notificationTitle,
+    notificationBody,
     message: data.message ? String(data.message) : undefined,
     subtitle,
     kundliUrl,

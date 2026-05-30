@@ -46,6 +46,7 @@ import {
   flushPendingIncomingChatAccept,
   rejectIncomingChatFromPush,
 } from '../services/push/incomingChatAcceptFlow';
+import { resolveIncomingChatParams } from '../services/push/resolveIncomingChatParams';
 import {
   clearPendingIncomingChat,
   setPendingIncomingChat,
@@ -144,22 +145,26 @@ export function RootNavigator() {
         if (!launch.params) {
           return;
         }
-        if (launch.decision === 'accept' && canEnterMainApp) {
+        if (launch.decision === 'accept') {
           fcmTrace('RootNavigator: probe → accept → ConsultationChat');
           void cancelIncomingChatNotifications();
           void stopIncomingChatNative();
           foregroundIncomingOverlayActiveRef.current = false;
           setIncomingChatOverlay(null);
-          acceptIncomingChatFromPush(dispatch, launch.params);
+          void acceptIncomingChatFromPush(dispatch, launch.params);
           return;
         }
-        if (launch.decision === 'reject' && canEnterMainApp) {
+        if (launch.decision === 'reject') {
           void cancelIncomingChatNotifications();
           void stopIncomingChatNative();
-          rejectIncomingChatFromPush(dispatch, launch.params);
+          if (canEnterMainApp) {
+            void rejectIncomingChatFromPush(dispatch, launch.params);
+          }
           return;
         }
-        showIncomingOverlay(launch.params, 'probe');
+        if (canEnterMainApp) {
+          showIncomingOverlay(launch.params, 'probe');
+        }
       },
       { maxAttempts: 30, intervalMs: 400 },
     );
@@ -179,19 +184,37 @@ export function RootNavigator() {
    * from `IncomingChatModule`). Pop the overlay live without remount.
    */
   useEffect(() => {
-    if (!canEnterMainApp) return;
-    const sub = subscribeIncomingChatIntent(params => {
+    const sub = subscribeIncomingChatIntent(launch => {
+      if (!launch.params) {
+        return;
+      }
       fcmTrace(
-        'RootNavigator: native onNewIntent overlay → room=',
-        params.roomId,
+        'RootNavigator: native onNewIntent room=',
+        launch.params.roomId,
+        'decision=',
+        launch.decision ?? '(none)',
       );
       void cancelIncomingChatNotifications();
       void stopIncomingChatNative();
-      foregroundIncomingOverlayActiveRef.current = true;
-      showIncomingOverlay(params, 'native-intent');
+      if (launch.decision === 'accept') {
+        foregroundIncomingOverlayActiveRef.current = false;
+        setIncomingChatOverlay(null);
+        void acceptIncomingChatFromPush(dispatch, launch.params);
+        return;
+      }
+      if (launch.decision === 'reject') {
+        if (canEnterMainApp) {
+          void rejectIncomingChatFromPush(dispatch, launch.params);
+        }
+        return;
+      }
+      if (canEnterMainApp) {
+        foregroundIncomingOverlayActiveRef.current = true;
+        showIncomingOverlay(launch.params, 'native-intent');
+      }
     });
     return () => sub?.remove();
-  }, [canEnterMainApp, showIncomingOverlay]);
+  }, [canEnterMainApp, dispatch, showIncomingOverlay]);
 
   useEffect(() => {
     let active = true;
@@ -256,7 +279,7 @@ export function RootNavigator() {
       void cancelIncomingChatNotifications();
       void clearPendingIncomingChat();
       void stopIncomingChatNative();
-      acceptIncomingChatFromPush(dispatch, p);
+      void acceptIncomingChatFromPush(dispatch, p);
     },
     [dispatch],
   );
@@ -268,7 +291,7 @@ export function RootNavigator() {
       void cancelIncomingChatNotifications();
       void clearPendingIncomingChat();
       void stopIncomingChatNative();
-      rejectIncomingChatFromPush(dispatch, p);
+      void rejectIncomingChatFromPush(dispatch, p);
     },
     [dispatch],
   );
@@ -447,19 +470,32 @@ export function RootNavigator() {
           actionId === 'incoming_chat_accept' ||
           actionId === 'incoming_chat_decline'
         ) {
-          const flat = flattenNotificationData(
-            n.data as Record<string, string | number | boolean | object | undefined>,
-          );
-          const params = getIncomingChatParamsFromData(flat);
-          if (params && canEnterMainApp) {
+          void (async () => {
+            const flat = flattenNotificationData(
+              n.data as Record<string, string | number | boolean | object | undefined>,
+            );
+            await Promise.all([
+              cancelIncomingChatNotifications(),
+              stopIncomingChatNative(),
+            ]);
             foregroundIncomingOverlayActiveRef.current = false;
             setIncomingChatOverlay(null);
-            if (actionId === 'incoming_chat_accept') {
-              acceptIncomingChatFromPush(dispatch, params);
-            } else {
-              rejectIncomingChatFromPush(dispatch, params);
+            const params = await resolveIncomingChatParams(flat, {
+              consumePending: true,
+            });
+            if (!params) {
+              fcmTrace('Notifee FG action: no params action=', actionId ?? '');
+              return;
             }
-          }
+            await clearPendingIncomingChat();
+            if (actionId === 'incoming_chat_accept') {
+              void acceptIncomingChatFromPush(dispatch, params);
+              return;
+            }
+            if (canEnterMainApp) {
+              void rejectIncomingChatFromPush(dispatch, params);
+            }
+          })();
           return;
         }
       }
@@ -483,11 +519,35 @@ export function RootNavigator() {
   }, [canEnterMainApp, dispatch]);
 
   useEffect(() => {
-    if (!canEnterMainApp || !navigationRef.isReady()) {
+    if (
+      isBootstrapping ||
+      isLanguageBootstrapping ||
+      !canEnterMainApp ||
+      !navigationRef.isReady()
+    ) {
       return;
     }
-    void flushPendingIncomingChatAccept(dispatch);
-  }, [canEnterMainApp, dispatch]);
+    const timer = setTimeout(() => {
+      void flushPendingIncomingChatAccept(dispatch);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [
+    isBootstrapping,
+    isLanguageBootstrapping,
+    canEnterMainApp,
+    dispatch,
+  ]);
+
+  /** Resume pending Accept → ConsultationChat when app returns to foreground. */
+  useEffect(() => {
+    if (!canEnterMainApp || appState !== 'active') {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void flushPendingIncomingChatAccept(dispatch);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [appState, canEnterMainApp, dispatch]);
 
   useEffect(() => {
     if (!canEnterMainApp && incomingChatOverlay) {

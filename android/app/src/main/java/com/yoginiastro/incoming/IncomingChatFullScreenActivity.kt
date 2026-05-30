@@ -29,15 +29,25 @@ class IncomingChatFullScreenActivity : AppCompatActivity() {
     setContentView(R.layout.activity_incoming_chat_fullscreen)
 
     val title =
-      intent.getStringExtra("title")?.takeIf { it.isNotBlank() }
-        ?: intent.getStringExtra("customerName")?.takeIf { it.isNotBlank() }
-        ?: "Incoming chat request"
+      IncomingChatDisplay.resolveTitle(
+        intent.extras?.let { extras ->
+          HashMap<String, String>().apply {
+            extras.keySet().forEach { key ->
+              extras.getString(key)?.let { put(key, it) }
+            }
+          }
+        } ?: emptyMap(),
+      )
 
-    val body =
-      intent.getStringExtra("body")?.takeIf { it.isNotBlank() }
-        ?: intent.getStringExtra("message")?.takeIf { it.isNotBlank() }
-        ?: intent.getStringExtra("subtitle")?.takeIf { it.isNotBlank() }
-        ?: "A user wants to chat with you."
+    val body = IncomingChatDisplay.resolveBody(
+      intent.extras?.let { extras ->
+        HashMap<String, String>().apply {
+          extras.keySet().forEach { key ->
+            extras.getString(key)?.let { put(key, it) }
+          }
+        }
+      } ?: emptyMap(),
+    )
 
     val customerName = intent.getStringExtra("customerName")?.trim().orEmpty()
 

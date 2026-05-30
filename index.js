@@ -10,6 +10,7 @@ import { AppRegistry, Platform } from 'react-native';
 import { name as appName } from './app.json';
 /** Redux store must load before `./App` so App → RootNavigator → push modules see a fully initialized store. */
 import { store } from './src/store';
+import { bootstrapAuth } from './src/store/slices/authSlice';
 import App from './App';
 import { fcmTrace, fcmTraceError } from './src/services/push/fcmDebug';
 import { captureFcmMessage } from './src/services/push/fcmInspector';
@@ -23,6 +24,11 @@ import {
   acceptIncomingChatFromPush,
   rejectIncomingChatFromPush,
 } from './src/services/push/incomingChatAcceptFlow';
+import {
+  canEnterMainAppFromAuthState,
+  ensureSessionForIncomingChatDecision,
+} from './src/services/push/ensureSessionForIncomingChatDecision';
+import { resolveIncomingChatParams } from './src/services/push/resolveIncomingChatParams';
 import {
   cancelIncomingChatNotifications,
   showLocalNotificationFromRemoteMessage,
@@ -66,29 +72,36 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 
   await Promise.all([
     cancelIncomingChatNotifications(),
-    clearPendingIncomingChat(),
     stopIncomingChatNative(),
   ]);
 
   const flat = flattenNotificationData(detail.notification.data);
-  const params = getIncomingChatParamsFromData(flat);
-  if (!params || !canEnterMainAppFromStore()) {
+  const params = await resolveIncomingChatParams(flat, { consumePending: true });
+  if (!params) {
+    fcmTraceError('notifee.onBackgroundEvent: no incoming chat params');
     return;
   }
+  await clearPendingIncomingChat();
   if (actionId === 'incoming_chat_accept') {
-    acceptIncomingChatFromPush(store.dispatch, params);
-  } else {
-    rejectIncomingChatFromPush(store.dispatch, params);
+    await acceptIncomingChatFromPush(store.dispatch, params);
+    return;
   }
+  const sessionReady = await ensureSessionForIncomingChatDecision();
+  if (!sessionReady || !canEnterMainAppFromAuthState()) {
+    return;
+  }
+  await rejectIncomingChatFromPush(store.dispatch, params);
 });
 
-function canEnterMainAppFromStore() {
-  const { auth } = store.getState();
-  return (
-    auth.isAuthenticated &&
-    !auth.pendingProfileCompletion &&
-    !auth.pendingAdminApproval
-  );
+async function canEnterMainAppFromStore() {
+  if (!store.getState().auth.token) {
+    try {
+      await store.dispatch(bootstrapAuth()).unwrap();
+    } catch {
+      return false;
+    }
+  }
+  return canEnterMainAppFromAuthState();
 }
 
 /**
@@ -128,7 +141,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   handleIncomingFcm(
     store.dispatch,
     remoteMessage,
-    canEnterMainAppFromStore(),
+    await canEnterMainAppFromStore(),
   );
   const params = getIncomingChatParamsFromRemoteMessage(remoteMessage);
   fcmTrace(
@@ -156,18 +169,21 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     handledNatively = await startIncomingChatNative(params);
     fcmTrace('BG handler native handled? ', handledNatively);
 
+    if (handledNatively) {
+      try {
+        await notifee.cancelAllNotifications();
+      } catch (e) {
+        fcmTraceError('BG handler dismiss duplicate Notifee notification failed', e);
+      }
+    }
+
     /**
-     * Killed app: native `startActivity` is often blocked; Notifee `fullScreenAction`
-     * is what actually wakes MainActivity so JS can show the custom Accept/Reject UI.
-     * When the native service already rings, use a silent Notifee notification.
+     * When native service is running it already shows CallStyle Accept/Reject
+     * (Android 12+) — skip Notifee to avoid duplicate grey action buttons.
      */
-    fcmTrace(
-      'BG handler → Notifee full-screen wake (skipSound=',
-      String(handledNatively),
-      ')',
-    );
     await showLocalNotificationFromRemoteMessage(remoteMessage, {
       skipSound: handledNatively,
+      skipDisplay: handledNatively,
     });
   } else if (!remoteMessage?.notification) {
     fcmTrace('BG handler → Notifee (non-incoming / data-only)');
@@ -185,20 +201,26 @@ AppRegistry.registerHeadlessTask(
       return;
     }
     const flat = flattenNotificationData(data ?? {});
-    const params = getIncomingChatParamsFromData(flat);
+    const params = await resolveIncomingChatParams(flat, { consumePending: true });
     await Promise.all([
       cancelIncomingChatNotifications(),
-      clearPendingIncomingChat(),
       stopIncomingChatNative(),
     ]);
-    if (!params || !canEnterMainAppFromStore()) {
+    if (!params) {
+      fcmTraceError('HeadlessTask: no incoming chat params');
       return;
     }
     if (decision === 'accept') {
-      acceptIncomingChatFromPush(store.dispatch, params);
-    } else {
-      rejectIncomingChatFromPush(store.dispatch, params);
+      await acceptIncomingChatFromPush(store.dispatch, params);
+      await clearPendingIncomingChat();
+      return;
     }
+    const sessionReady = await ensureSessionForIncomingChatDecision();
+    if (!sessionReady || !canEnterMainAppFromAuthState()) {
+      return;
+    }
+    await clearPendingIncomingChat();
+    await rejectIncomingChatFromPush(store.dispatch, params);
   },
 );
 

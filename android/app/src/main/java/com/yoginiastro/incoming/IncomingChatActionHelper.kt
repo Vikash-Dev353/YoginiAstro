@@ -11,16 +11,16 @@ import com.yoginiastro.MainActivity
  */
 object IncomingChatActionHelper {
 
-  fun readPayload(intent: Intent): HashMap<String, String> {
-    val payload = HashMap<String, String>()
-    intent.extras?.keySet()?.forEach { key ->
-      intent.extras?.getString(key)?.let { payload[key] = it }
-    }
-    return payload
+  fun resolvePayload(context: Context, sourceIntent: Intent): HashMap<String, String> {
+    val merged = HashMap<String, String>()
+    IncomingChatPayloadStore.load(context)?.forEach { (k, v) -> merged[k] = v }
+    val fromIntent = IncomingChatPayloadStore.readFromIntent(sourceIntent)
+    fromIntent?.forEach { (k, v) -> merged[k] = v }
+    return merged
   }
 
   fun accept(context: Context, sourceIntent: Intent) {
-    val payload = readPayload(sourceIntent)
+    val payload = resolvePayload(context, sourceIntent)
     IncomingChatService.stop(context)
     IncomingChatPayloadStore.clear(context)
     dispatch(context, "accept", payload)
@@ -28,7 +28,7 @@ object IncomingChatActionHelper {
   }
 
   fun reject(context: Context, sourceIntent: Intent) {
-    val payload = readPayload(sourceIntent)
+    val payload = resolvePayload(context, sourceIntent)
     IncomingChatService.stop(context)
     IncomingChatPayloadStore.clear(context)
     dispatch(context, "reject", payload)

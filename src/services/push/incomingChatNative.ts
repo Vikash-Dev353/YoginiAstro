@@ -7,6 +7,10 @@ import {
 import type { OrderStackParamList } from '../../navigation/types';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
+  resolveIncomingChatBody,
+  resolveIncomingChatTitle,
+} from './incomingChatDisplay';
+import {
   flattenNotificationData,
   getIncomingChatParamsFromData,
   parseIncomingChatLaunchRaw,
@@ -59,6 +63,31 @@ function stringifyForNative(
  *
  * Returns false on iOS / when the bridge isn't installed.
  */
+function buildNativePayload(
+  params: OrderStackParamList['IncomingChatRequest'],
+): Record<string, string> {
+  const title = resolveIncomingChatTitle(params);
+  const body = resolveIncomingChatBody(params);
+  return stringifyForNative({
+    type: 'incoming_chat',
+    roomId: params.roomId,
+    from: params.from,
+    senderId: params.from,
+    customerName: params.customerName,
+    title,
+    body,
+    customerImage: params.customerImage,
+    message: params.message ?? body,
+    subtitle: params.subtitle,
+    kundliUrl: params.kundliUrl,
+    userBalance: params.userBalance,
+    astroPrice: params.astroPrice,
+    kundaliPayload: params.kundaliPayload
+      ? JSON.stringify(params.kundaliPayload)
+      : undefined,
+  });
+}
+
 /** Writes payload to native SharedPreferences (survives killed app + notification tap). */
 export async function persistIncomingChatPayloadNative(
   params: OrderStackParamList['IncomingChatRequest'],
@@ -66,24 +95,7 @@ export async function persistIncomingChatPayloadNative(
   const mod = ensureAndroid();
   if (!mod) return;
   try {
-    const payload = stringifyForNative({
-      type: 'incoming_chat',
-      roomId: params.roomId,
-      from: params.from,
-      senderId: params.from,
-      customerName: params.customerName,
-      title: params.notificationTitle,
-      body: params.notificationBody,
-      customerImage: params.customerImage,
-      message: params.message,
-      subtitle: params.subtitle,
-      kundliUrl: params.kundliUrl,
-      userBalance: params.userBalance,
-      astroPrice: params.astroPrice,
-      kundaliPayload: params.kundaliPayload
-        ? JSON.stringify(params.kundaliPayload)
-        : undefined,
-    });
+    const payload = buildNativePayload(params);
     await mod.persistIncomingChatPayload(payload);
     fcmTrace('IncomingChat native: persistIncomingChatPayload OK room=', params.roomId);
   } catch (error) {
@@ -97,24 +109,7 @@ export async function startIncomingChatNative(
   const mod = ensureAndroid();
   if (!mod) return false;
   try {
-    const payload = stringifyForNative({
-      type: 'incoming_chat',
-      roomId: params.roomId,
-      from: params.from,
-      senderId: params.from,
-      customerName: params.customerName,
-      title: params.notificationTitle,
-      body: params.notificationBody,
-      customerImage: params.customerImage,
-      message: params.message,
-      subtitle: params.subtitle,
-      kundliUrl: params.kundliUrl,
-      userBalance: params.userBalance,
-      astroPrice: params.astroPrice,
-      kundaliPayload: params.kundaliPayload
-        ? JSON.stringify(params.kundaliPayload)
-        : undefined,
-    });
+    const payload = buildNativePayload(params);
     await mod.startIncomingChat(payload);
     fcmTrace('IncomingChat native: startIncomingChat OK room=', params.roomId);
     return true;
@@ -167,16 +162,16 @@ export async function consumeIncomingChatLaunchAction(): Promise<IncomingChatLau
  * service launch fires `onNewIntent` on the singleTask MainActivity.
  */
 export function subscribeIncomingChatIntent(
-  handler: (params: OrderStackParamList['IncomingChatRequest']) => void,
+  handler: (launch: IncomingChatLaunchConsume) => void,
 ): EmitterSubscription | null {
   if (Platform.OS !== 'android') return null;
   return DeviceEventEmitter.addListener(
     'IncomingChat:onIntent',
     (raw: Record<string, string>) => {
       const flat = flattenNotificationData(raw);
-      const params = getIncomingChatParamsFromData(flat);
-      if (params) {
-        handler(params);
+      const launch = parseIncomingChatLaunchRaw(flat);
+      if (launch.params) {
+        handler(launch);
       }
     },
   );

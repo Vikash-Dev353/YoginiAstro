@@ -54,9 +54,24 @@ export function SettingScreen({ navigation, route }: Props) {
     );
   };
 
-  const onLogoutPress = () => {
+  const performLogout = () => {
     dispatch(setAuthEntryRoute('Signup'));
     dispatch(logout());
+  };
+
+  const onLogoutPress = () => {
+    Alert.alert(
+      t('profile.clearDataLogoutConfirmTitle'),
+      t('profile.clearDataLogoutConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          style: 'destructive',
+          onPress: performLogout,
+        },
+      ],
+    );
   };
 
   const onBackPress = () => {

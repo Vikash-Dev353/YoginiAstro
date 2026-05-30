@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import com.yoginiastro.MainActivity
 import com.yoginiastro.R
 
@@ -56,13 +57,8 @@ class IncomingChatService : Service() {
 
     IncomingChatPayloadStore.save(this, payload)
 
-    val callerName = payload["title"]?.takeIf { it.isNotBlank() }
-      ?: payload["customerName"]?.takeIf { it.isNotBlank() }
-      ?: "Chat request"
-    val callerSubtitle = payload["body"]?.takeIf { it.isNotBlank() }
-      ?: payload["message"]?.takeIf { it.isNotBlank() }
-      ?: payload["subtitle"]?.takeIf { it.isNotBlank() }
-      ?: "User wants to chat"
+    val callerName = IncomingChatDisplay.resolveTitle(payload)
+    val callerSubtitle = IncomingChatDisplay.resolveBody(payload)
 
     /**
      * Backend currently includes a `notification` field in its FCM payload,
@@ -165,14 +161,14 @@ class IncomingChatService : Service() {
       pendingIntentFlags(),
     )
 
-    val acceptIntent = Intent(this, IncomingChatActionReceiver::class.java).apply {
-      action = IncomingChatActionReceiver.ACTION_ACCEPT
-      putExtras(launchActivityIntent)
-    }
-    val rejectIntent = Intent(this, IncomingChatActionReceiver::class.java).apply {
-      action = IncomingChatActionReceiver.ACTION_REJECT
-      putExtras(launchActivityIntent)
-    }
+    val acceptIntent = actionReceiverIntent(
+      IncomingChatActionReceiver.ACTION_ACCEPT,
+      payload,
+    )
+    val rejectIntent = actionReceiverIntent(
+      IncomingChatActionReceiver.ACTION_REJECT,
+      payload,
+    )
     val acceptPI = PendingIntent.getBroadcast(
       this, REQ_ACCEPT, acceptIntent, pendingIntentFlags(),
     )
@@ -180,7 +176,7 @@ class IncomingChatService : Service() {
       this, REQ_REJECT, rejectIntent, pendingIntentFlags(),
     )
 
-    return NotificationCompat.Builder(this, CHANNEL_ID)
+    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(title)
       .setContentText(body)
@@ -193,10 +189,35 @@ class IncomingChatService : Service() {
       .setOnlyAlertOnce(false)
       .setContentIntent(contentPI)
       .setFullScreenIntent(contentPI, true)
-      .addAction(0, "Accept", acceptPI)
-      .addAction(0, "Reject", rejectPI)
-      .build()
+
+    /**
+     * CallStyle (Android 12+) renders proper Decline / Answer buttons — no clipped
+     * custom RemoteViews. Older devices fall back to icon actions.
+     */
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      val caller = Person.Builder().setName(title).build()
+      builder
+        .setContentText(body)
+        .setStyle(
+          NotificationCompat.CallStyle.forIncomingCall(caller, rejectPI, acceptPI),
+        )
+    } else {
+      builder
+        .addAction(R.drawable.ic_notif_action_reject, "Reject", rejectPI)
+        .addAction(R.drawable.ic_notif_action_accept, "Accept", acceptPI)
+    }
+
+    return builder.build()
   }
+
+  private fun actionReceiverIntent(
+    action: String,
+    payload: HashMap<String, String>,
+  ): Intent =
+    Intent(this, IncomingChatActionReceiver::class.java).apply {
+      this.action = action
+      payload.forEach { (k, v) -> putExtra(k, v) }
+    }
 
   private fun mainActivityIntent(payload: HashMap<String, String>): Intent {
     return Intent(this, MainActivity::class.java).apply {

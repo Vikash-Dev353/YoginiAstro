@@ -90,8 +90,25 @@ app.post('/v1/send-incoming-chat', async (req, res) => {
       type: 'incoming_chat',
       roomId: String(roomId),
       senderId: String(senderId),
-      customerName: body.customerName != null ? String(body.customerName) : 'Chat request',
+      customerName:
+        body.customerName != null ? String(body.customerName) : 'Chat request',
+      title:
+        body.customerName != null
+          ? String(body.customerName)
+          : body.title != null
+            ? String(body.title)
+            : 'Incoming chat request',
+      body:
+        body.message != null
+          ? String(body.message)
+          : body.waitingCount != null && Number(body.waitingCount) > 0
+            ? `Users waiting: ${body.waitingCount}`
+            : 'Wants to chat with you',
       ...(body.message != null ? { message: String(body.message) } : {}),
+      ...(body.subtitle != null ? { subtitle: String(body.subtitle) } : {}),
+      ...(body.waitingCount != null
+        ? { waitingCount: String(body.waitingCount) }
+        : {}),
       ...(body.customerImage != null ? { customerImage: String(body.customerImage) } : {}),
       ...(body.kundliUrl != null ? { kundliUrl: String(body.kundliUrl) } : {}),
       ...(body.userBalance != null ? { userBalance: String(body.userBalance) } : {}),

@@ -10,6 +10,8 @@ export const API_ROUTES = {
     getMonthlyEarnings: "/astro/get-monthly-earnings",
     monthlyReports: (astroId: string) => `/astro/monthly-reports/${astroId}`,
     getLatestReviews: "/astro/get-latest-reviews",
+    getProfile: "/astro/get-profile",
+    updateProfile: "/astro/update-profile",
     recentConsultations: (astroId: string) =>
       `/astro/recent-consultations/${astroId}`,
     login: "/auth/login",

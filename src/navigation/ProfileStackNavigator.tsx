@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from './types';
+import { CompleteProfileScreen } from '../screens/profile/CompleteProfileScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { ComingSoonScreen } from '../screens/common/ComingSoonScreen';
 import { ReviewScreen } from '../screens/profile/ReviewScreen';
@@ -17,6 +18,7 @@ export function ProfileStackNavigator() {
       screenOptions={{ headerShown: false, animation: 'none' }}
     >
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
+      <Stack.Screen name="EditProfile" component={CompleteProfileScreen} />
       <Stack.Screen name="CustomerSupport" component={SupportScreen} />
       <Stack.Screen name="GoLiveNow" component={ComingSoonScreen} />
       <Stack.Screen name="ComingSoon" component={ComingSoonScreen} />

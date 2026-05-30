@@ -1,7 +1,8 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
 import { ProfileTabItem } from '../../components/profile/ProfileTabItem';
@@ -53,6 +54,8 @@ export function ProfileScreen({ navigation }: Props) {
     try {
       const response = await astroApi.getOnline({ astroId });
       const astrologer = getAstrologerFromOnlineResponse(response);
+
+      console.log('astrologer===>>>', astrologer);
       if (astrologer?.name) {
         setDisplayName(astrologer.name);
       }
@@ -74,6 +77,15 @@ export function ProfileScreen({ navigation }: Props) {
     loadProfile();
   }, [loadProfile, token]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) {
+        return;
+      }
+      loadProfile();
+    }, [loadProfile, token]),
+  );
+
   const avatarLabel = useMemo(
     () => initialsFromName(displayName || astroId),
     [displayName, astroId],
@@ -86,6 +98,10 @@ export function ProfileScreen({ navigation }: Props) {
     { kind: 'stack', route: 'Review', label: t('common.review'), iconLabel: 'R' },
     { kind: 'stack', route: 'Setting', label: t('common.setting'), iconLabel: 'T' },
   ];
+
+  const onEditPress = () => {
+    navigation.navigate('EditProfile');
+  };
 
   const onMenuPress = (item: MenuItem) => {
     if (item.kind === 'walletTab') {
@@ -102,7 +118,16 @@ export function ProfileScreen({ navigation }: Props) {
       <AppHeader title={t('profile.astrologerProfile')} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.userCard}>
-          <View style={styles.userLeft}>
+          <Pressable
+            style={styles.editButton}
+            onPress={onEditPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.editProfile')}
+          >
+            <Text style={styles.editButtonText}>{t('profile.edit')}</Text>
+          </Pressable>
+
+          <View style={styles.userRow}>
             <View style={styles.avatar}>
               {profileImageUri && !imageFailed ? (
                 <Image
@@ -115,20 +140,21 @@ export function ProfileScreen({ navigation }: Props) {
                 <Text style={styles.avatarText}>{avatarLabel}</Text>
               )}
             </View>
-            <View>
-              <Text style={styles.name} numberOfLines={2}>
+
+            <View style={styles.userInfo}>
+              <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
                 {displayName || '—'}
               </Text>
-              <Text style={styles.detail}>
+              <Text style={styles.detail} numberOfLines={1} ellipsizeMode="tail">
                 {mobile ? `+91 ${mobile}` : '—'}
               </Text>
             </View>
-          </View>
 
-          <View style={styles.progressWrap}>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressText}>40%</Text>
-            </View>
+            {/* <View style={styles.progressWrap}>
+              <View style={styles.progressCircle}>
+                <Text style={styles.progressText}>40%</Text>
+              </View>
+            </View> */}
           </View>
         </View>
 
@@ -156,25 +182,47 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   userCard: {
+    position: 'relative',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2DEDE',
     backgroundColor: '#FFFFFF',
     minHeight: 102,
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 40,
+    paddingBottom: 12,
     shadowColor: '#000000',
     shadowOpacity: 0.07,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  userLeft: {
+  editButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    borderWidth: 1,
+    borderColor: '#7B4949',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  userRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  userInfo: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
+  },
+  editButtonText: {
+    fontSize: normalizeFont(12),
+    color: '#5A2525',
+    fontWeight: '700',
   },
   avatar: {
     width: 72,
@@ -197,7 +245,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   name: {
-    fontSize: normalizeFont(30 / 1.8),
+    fontSize: normalizeFont(16),
+    lineHeight: normalizeFont(20),
     color: '#3B2222',
     fontWeight: '700',
   },
@@ -208,7 +257,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   progressWrap: {
-    width: 56,
+    width: 52,
+    flexShrink: 0,
     alignItems: 'center',
   },
   progressCircle: {

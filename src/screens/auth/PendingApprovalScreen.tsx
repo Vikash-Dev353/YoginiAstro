@@ -13,6 +13,7 @@ import { useTranslation } from '../../localization/useTranslation';
 import type { AuthStackParamList } from '../../navigation/types';
 import {
   astroApi,
+  getAstroProfileFromGetProfileResponse,
   isAstrologerApprovedByAdmin,
 } from '../../services/api/astroApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -41,7 +42,7 @@ function PendingApprovalScreenComponent() {
     setChecking(true);
     try {
       const res = await astroApi.getProfile({ astroId });
-      const profile = res.astrologer ?? res.data ?? res.profile;
+      const profile = getAstroProfileFromGetProfileResponse(res);
       if (isAstrologerApprovedByAdmin(profile)) {
         await dispatch(
           applyAuthGate({
