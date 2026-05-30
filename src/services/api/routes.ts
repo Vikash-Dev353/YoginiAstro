@@ -12,6 +12,7 @@ export const API_ROUTES = {
     getLatestReviews: "/astro/get-latest-reviews",
     getProfile: "/astro/get-profile",
     updateProfile: "/astro/update-profile",
+    initialProfile: "/astro/initial-profile",
     recentConsultations: (astroId: string) =>
       `/astro/recent-consultations/${astroId}`,
     login: "/auth/login",

@@ -392,42 +392,6 @@ const languagesValuesToJsonPayload = (values: string[]) => {
   return JSON.stringify(list);
 };
 
-/** mob/astro/update-profile — `"Vedic","Palmistry"` */
-function skillLabelForUpdatePayload(
-  value: string,
-  skillOptions: { value: string; label: string }[],
-): string {
-  const option = skillOptions.find(o => o.value === value);
-  if (option) {
-    return option.label;
-  }
-  if (value.startsWith('api:')) {
-    return value
-      .slice(4)
-      .split('-')
-      .filter(Boolean)
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
-  }
-  return value;
-}
-
-function skillsValuesToUpdatePayload(
-  values: string[],
-  skillOptions: { value: string; label: string }[],
-): string {
-  const labels = values.map(v => skillLabelForUpdatePayload(v, skillOptions));
-  return `"${labels.join('","')}"`;
-}
-
-/** mob/astro/update-profile — `"Hindi","English"` */
-function languagesValuesToUpdatePayload(values: string[]): string {
-  const labels = values.map(
-    v => LANGUAGE_OPTIONS.find(o => o.value === v)?.label ?? v,
-  );
-  return `"${labels.join('","')}"`;
-}
-
 function mapLanguageTokensToValues(tokens: string[]): string[] {
   const allowed = new Set(LANGUAGE_OPTIONS.map(o => o.value));
   const out = new Set<string>();
@@ -578,7 +542,11 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
   const userEmail = useAppSelector(state => state.auth.user?.email)?.trim() || '';
 
   const [fullName, setFullName] = useState('');
+  const [realName, setRealName] = useState('');
   const [profileMobile, setProfileMobile] = useState('');
+  const [price, setPrice] = useState('6');
+  const [callPrice, setCallPrice] = useState('6');
+  const [videoPrice, setVideoPrice] = useState('6');
   const [profileImageUri, setProfileImageUri] = useState<LocalImageRef>(null);
   const [aadharImageUri, setAadharImageUri] = useState<LocalImageRef>(null);
   const [panImageUri, setPanImageUri] = useState<LocalImageRef>(null);
@@ -643,7 +611,17 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
 
   const applyProfileData = useCallback((profile: AstroProfile) => {
     setFullName(profile.name?.trim() || '');
+    setRealName(profile.realName?.trim() || profile.name?.trim() || '');
     setProfileMobile(profile.mobile?.trim() || '');
+    if (profile.price !== undefined && profile.price !== null) {
+      setPrice(String(profile.price));
+    }
+    if (profile.callPrice !== undefined && profile.callPrice !== null) {
+      setCallPrice(String(profile.callPrice));
+    }
+    if (profile.videoPrice !== undefined && profile.videoPrice !== null) {
+      setVideoPrice(String(profile.videoPrice));
+    }
     setGender(normalizeGenderLabel(profile.gender));
     setAddress(profile.address?.trim() || '');
     setDescription(
@@ -929,10 +907,7 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
       Alert.alert('Error', 'Please enter a valid 6-digit pincode.');
       return;
     }
-    if (
-      !isEditMode &&
-      (!stateName.trim() || !city.trim())
-    ) {
+    if (!stateName.trim() || !city.trim()) {
       Alert.alert('Error', 'Please select state and city.');
       return;
     }
@@ -991,31 +966,9 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
     const payload = new FormData();
 
     if (isEditMode) {
-      payload.append('name', fullName.trim());
-      payload.append('mobile', mobile);
-      payload.append('gender', gender || 'Male');
-      payload.append('dob', formatDateAsYyyyMmDd(dobDate));
-      payload.append(
-        'skills',
-        skillsValuesToUpdatePayload(selectedSkills, skillOptions),
-      );
-      payload.append(
-        'languages',
-        languagesValuesToUpdatePayload(selectedLanguages),
-      );
-      payload.append('address', address.trim());
-      payload.append('pincode', pincode.trim());
-      payload.append(
-        'speciality',
-        specialityValuesToJsonPayload(selectedSpecialities),
-      );
-      payload.append('accountHolderName', holderName);
-      payload.append('bankName', bank);
-      payload.append('accountNumber', accountNo);
-      payload.append('ifscCode', ifsc);
-      payload.append('astroId', astroId.trim().toUpperCase());
-    } else {
-      payload.append('name', fullName.trim());
+      const trimmedName = fullName.trim();
+      payload.append('name', trimmedName);
+      payload.append('realName', realName.trim() || trimmedName);
       payload.append('gender', gender || 'Male');
       payload.append('dob', formatDateAsYyyyMmDd(dobDate));
       payload.append('skills', skillsValuesToJsonPayload(selectedSkills));
@@ -1030,7 +983,36 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
         'speciality',
         specialityValuesToJsonPayload(selectedSpecialities),
       );
-      payload.append('country', 'IN');
+      payload.append('country', country);
+      payload.append('state', stateName.trim());
+      payload.append('city', city.trim());
+      payload.append('price', price.trim() || '6');
+      payload.append('callPrice', callPrice.trim() || '6');
+      payload.append('videoPrice', videoPrice.trim() || '6');
+      payload.append('accountHolderName', holderName);
+      payload.append('bankName', bank);
+      payload.append('accountNumber', accountNo);
+      payload.append('ifscCode', ifsc);
+      payload.append('astroId', astroId.trim().toUpperCase());
+    } else {
+      const trimmedName = fullName.trim();
+      payload.append('name', trimmedName);
+      payload.append('realName', trimmedName);
+      payload.append('gender', gender || 'Male');
+      payload.append('dob', formatDateAsYyyyMmDd(dobDate));
+      payload.append('skills', skillsValuesToJsonPayload(selectedSkills));
+      payload.append('languages', languagesValuesToJsonPayload(selectedLanguages));
+      payload.append('address', address.trim());
+      payload.append('pincode', pincode.trim());
+      payload.append('mobile', mobile);
+      payload.append('description', description.trim() || '—');
+      payload.append('email', userEmail.trim() || 'test@gmail.com');
+      payload.append('experience', experience.trim() || '0');
+      payload.append(
+        'speciality',
+        specialityValuesToJsonPayload(selectedSpecialities),
+      );
+      payload.append('country', country);
       payload.append('state', stateName.trim());
       payload.append('city', city.trim());
       payload.append('accountHolderName', holderName);
@@ -1101,6 +1083,10 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
     dobDate,
     experience,
     fullName,
+    realName,
+    price,
+    callPrice,
+    videoPrice,
     gender,
     ifscCode,
     selectedLanguages,

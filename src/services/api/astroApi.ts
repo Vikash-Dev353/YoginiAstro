@@ -439,6 +439,7 @@ export type UpdateProfileResponse = {
 export type AstroProfile = {
   astroId?: string;
   name?: string;
+  realName?: string;
   mobile?: string;
   gender?: string;
   languages?: string[] | string;
@@ -448,6 +449,7 @@ export type AstroProfile = {
   experience?: number | string;
   price?: number | string;
   callPrice?: number | string;
+  videoPrice?: number | string;
   dob?: string;
   address?: string;
   city?: string;
@@ -533,6 +535,7 @@ export function normalizeAstroProfileFromApi(
   return {
     astroId: optionalProfileString(raw.astroId ?? raw.astro_id),
     name: optionalProfileString(raw.name ?? raw.fullName),
+    realName: optionalProfileString(raw.realName ?? raw.real_name),
     mobile: optionalProfileString(raw.mobile),
     gender: optionalProfileString(raw.gender),
     languages: (raw.languages ?? raw.language) as AstroProfile['languages'],
@@ -542,6 +545,7 @@ export function normalizeAstroProfileFromApi(
     experience: (raw.experience ?? raw.experienceYears) as AstroProfile['experience'],
     price: raw.price as AstroProfile['price'],
     callPrice: (raw.callPrice ?? raw.call_price) as AstroProfile['callPrice'],
+    videoPrice: (raw.videoPrice ?? raw.video_price) as AstroProfile['videoPrice'],
     dob: optionalProfileString(raw.dob ?? raw.dateOfBirth ?? raw.date_of_birth),
     address: optionalProfileString(raw.address),
     city: optionalProfileString(raw.city),
@@ -772,10 +776,9 @@ export const astroApi = {
     ),
   submitInitialProfile: (payload: FormData) =>
     apiService.post<UpdateProfileResponse>(
-      '/astrologer/initial-profile',
+      API_ROUTES.auth.initialProfile,
       payload,
       {
-        baseURL: 'https://yoginiastro.com/api-v2',
         headers: {
           'Content-Type': 'multipart/form-data',
         },

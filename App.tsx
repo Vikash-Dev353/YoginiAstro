@@ -4,7 +4,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { store } from './src/store';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { images } from './src/assets/images';
-import { IncomingChatDebugPanel } from './src/components/dev/IncomingChatDebugPanel';
 import { useEffect } from 'react';
 import { getMessaging } from '@react-native-firebase/messaging';
 
@@ -29,7 +28,6 @@ function App() {
         >
           <StatusBar barStyle="dark-content" />
           <RootNavigator />
-          {__DEV__ ? <IncomingChatDebugPanel /> : null}
         </ImageBackground>
       </SafeAreaProvider>
     </Provider>
