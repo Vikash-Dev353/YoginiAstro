@@ -27,6 +27,7 @@ import {
   verifyRegisterOtp,
 } from "../../store/slices/authSlice";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
+import { resolveAuthGateAfterOtpVerify } from "../../utils/authGateFromOtp";
 import { storage } from "../../utils/storage";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "OtpVerification">;
@@ -48,13 +49,13 @@ function normalizeVerifyOtpResponse(raw: unknown): VerifyOtpResponse {
     token: merged.token as string | undefined,
     authorization: merged.authorization as string | undefined,
     astroId: merged.astroId as string | undefined,
+    approvalStatus: merged.approvalStatus as string | undefined,
     user: merged.user as VerifyOtpResponse["user"],
   };
 }
 
 function OtpVerificationScreenComponent({ route, navigation }: Props) {
   const { mobile, flow = "login", isNewAstrologer = false } = route.params;
-  const needsCompleteProfile = flow === "register" || isNewAstrologer;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -144,7 +145,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
 
     try {
       const verifyAction =
-        needsCompleteProfile && !isNewAstrologer
+        flow === "register"
           ? verifyRegisterOtp({ mobile, otp: otpValue })
           : verifyOtp({ mobile, otp: otpValue });
       const response = await dispatch(verifyAction).unwrap();
@@ -169,53 +170,36 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
         decodeAstroIdFromToken(token);
       await storage.setAuthToken(token);
 
-      if (needsCompleteProfile) {
-        dispatch(
-          setAuthenticatedSession({
-            token,
-            astroId: resolvedAstroId || null,
-            user: {
-              id: userId || resolvedAstroId || "72",
-              name: normalized.user?.name || "Shrimaan",
-              email: normalized.user?.email || `${mobile}@yoginiastro.com`,
-            },
-            pendingProfileCompletion: true,
-            pendingAdminApproval: false,
-          })
-        );
-        await dispatch(
-          applyAuthGate({
-            pendingProfileCompletion: true,
-            pendingAdminApproval: false,
-          })
-        ).unwrap();
+      const authGate = resolveAuthGateAfterOtpVerify({
+        flow,
+        isNewAstrologer,
+        approvalStatus: normalized.approvalStatus,
+      });
+
+      const sessionUser = {
+        id: userId || resolvedAstroId || "72",
+        name: normalized.user?.name || "Shrimaan",
+        email: normalized.user?.email || `${mobile}@yoginiastro.com`,
+      };
+
+      dispatch(
+        setAuthenticatedSession({
+          token,
+          astroId: resolvedAstroId || null,
+          user: sessionUser,
+          pendingProfileCompletion: authGate.pendingProfileCompletion,
+          pendingAdminApproval: authGate.pendingAdminApproval,
+        }),
+      );
+      await dispatch(applyAuthGate(authGate)).unwrap();
+
+      if (authGate.pendingProfileCompletion) {
         navigation.replace("CompleteProfile");
-      } else {
-        dispatch(
-          setAuthenticatedSession({
-            token,
-            astroId: resolvedAstroId || null,
-            user: {
-              id: userId || resolvedAstroId || "72",
-              name: normalized.user?.name || "Shrimaan",
-              email: normalized.user?.email || `${mobile}@yoginiastro.com`,
-            },
-          })
-        );
-        await dispatch(
-          applyAuthGate({
-            pendingProfileCompletion: false,
-            pendingAdminApproval: false,
-          })
-        ).unwrap();
       }
 
-      /** Profile completion flow does not open main app yet — attach here. */
-      if (needsCompleteProfile) {
-        const attachAstroId = resolvedAstroId || decodeAstroIdFromToken(token) || "";
-        if (attachAstroId) {
-          void attachDeviceToUser({ authToken: token, astroId: attachAstroId });
-        }
+      const attachAstroId = resolvedAstroId || decodeAstroIdFromToken(token) || "";
+      if (attachAstroId && !authGate.pendingProfileCompletion) {
+        void attachDeviceToUser({ authToken: token, astroId: attachAstroId });
       }
 
       setLoading(false);
@@ -226,15 +210,7 @@ function OtpVerificationScreenComponent({ route, navigation }: Props) {
       );
       setLoading(false);
     }
-  }, [
-    dispatch,
-    isNewAstrologer,
-    mobile,
-    navigation,
-    needsCompleteProfile,
-    otpValue,
-    t,
-  ]);
+  }, [dispatch, flow, isNewAstrologer, mobile, navigation, otpValue, t]);
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");

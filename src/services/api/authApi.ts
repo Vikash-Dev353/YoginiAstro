@@ -68,6 +68,7 @@ export type VerifyOtpResponse = {
   /** JWT – backend may send token in this field */
   authorization?: string;
   astroId?: string;
+  approvalStatus?: string;
   user?: {
     id?: string;
     name?: string;
@@ -79,6 +80,7 @@ export type VerifyOtpResponse = {
     status?: string;
     authorization?: string;
     astroId?: string;
+    approvalStatus?: string;
   };
 };
 

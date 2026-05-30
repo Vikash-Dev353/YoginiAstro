@@ -57,9 +57,8 @@ function LoginScreenComponent({ navigation }: Props) {
       if (response.status?.toLowerCase() === 'success') {
         navigation.navigate('OtpVerification', {
           mobile,
-          ...(response.isNewAstrologer
-            ? { flow: 'register' as const, isNewAstrologer: true }
-            : {}),
+          flow: 'login',
+          isNewAstrologer: response.isNewAstrologer ?? false,
         });
         return;
       }
