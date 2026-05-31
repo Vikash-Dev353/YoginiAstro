@@ -2,7 +2,7 @@ import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import messaging from '@react-native-firebase/messaging';
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import notifee, { EventType } from '@notifee/react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   DeviceEventEmitter,
@@ -20,17 +20,26 @@ import { attachDeviceToUser } from '../services/device/registerDevice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { bootstrapAuth, decodeAstroIdFromToken } from '../store/slices/authSlice';
 import { bootstrapLanguage } from '../store/slices/languageSlice';
-import { syncSocketSession } from '../store/slices/socketSlice';
+import {
+  selectChatRequests,
+  syncSocketSession,
+} from '../store/slices/socketSlice';
 import { AppLoader } from '../components/common/AppLoader';
 import {
   checkForAppUpdate,
   type UpdateDecision,
 } from '../services/update/appUpdateService';
 import { CustomIncomingNotificationScreen } from '../components/push/CustomIncomingNotificationScreen';
-import { foregroundIncomingOverlayActiveRef } from '../services/push/foregroundIncomingOverlay';
+import {
+  foregroundIncomingOverlayActiveRef,
+  isIncomingRoomHandled,
+  markIncomingRoomHandled,
+} from '../services/push/foregroundIncomingOverlay';
+import { isIncomingChatAcceptInFlight } from '../services/push/incomingChatAcceptFlow';
 import {
   flushPendingWaitlistFcmNavigation,
   flattenNotificationData,
+  getIncomingChatParamsFromChatRequestItem,
   getIncomingChatParamsFromData,
   handleIncomingChatNotificationOpen,
   handleIncomingFcm,
@@ -101,6 +110,15 @@ export function RootNavigator() {
   const [incomingChatOverlay, setIncomingChatOverlay] = useState<
     OrderStackParamList['IncomingChatRequest'] | null
   >(null);
+  const chatRequests = useAppSelector(selectChatRequests);
+  const lastSocketOverlayRoomRef = useRef<string | null>(null);
+
+  /** Keep MainTabNavigator in sync — ref must not stay true when overlay is hidden. */
+  useEffect(() => {
+    foregroundIncomingOverlayActiveRef.current = Boolean(
+      incomingChatOverlay && canEnterMainApp,
+    );
+  }, [incomingChatOverlay, canEnterMainApp]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -122,14 +140,73 @@ export function RootNavigator() {
 
   const showIncomingOverlay = useCallback(
     (params: OrderStackParamList['IncomingChatRequest'], source: string) => {
+      if (
+        isIncomingRoomHandled(params.roomId) ||
+        isIncomingChatAcceptInFlight(params.roomId)
+      ) {
+        fcmTrace(
+          'RootNavigator: skip overlay (handled/in-flight) room=',
+          params.roomId,
+        );
+        return;
+      }
       fcmTrace('RootNavigator: show incoming overlay ←', source, 'room=', params.roomId);
+      lastSocketOverlayRoomRef.current = params.roomId;
+      foregroundIncomingOverlayActiveRef.current = true;
       void cancelIncomingChatNotifications();
       void stopIncomingChatNative();
-      foregroundIncomingOverlayActiveRef.current = true;
       setIncomingChatOverlay(params);
     },
     [],
   );
+
+  /**
+   * App open + socket `chat-requests` (same path as working release build).
+   * Shows custom Accept/Reject overlay + ring when FCM is delayed or missing.
+   */
+  useEffect(() => {
+    if (
+      isBootstrapping ||
+      isLanguageBootstrapping ||
+      !canEnterMainApp ||
+      !isAppForeground
+    ) {
+      return;
+    }
+
+    const [first] = chatRequests;
+    if (!first?.roomId) {
+      lastSocketOverlayRoomRef.current = null;
+      return;
+    }
+    if (
+      isIncomingRoomHandled(first.roomId) ||
+      isIncomingChatAcceptInFlight(first.roomId)
+    ) {
+      return;
+    }
+    if (first.roomId === lastSocketOverlayRoomRef.current) {
+      return;
+    }
+    if (incomingChatOverlay?.roomId === first.roomId) {
+      return;
+    }
+
+    const params = getIncomingChatParamsFromChatRequestItem(first);
+    if (!params) {
+      return;
+    }
+
+    showIncomingOverlay(params, 'socket-chat-requests');
+  }, [
+    canEnterMainApp,
+    chatRequests,
+    incomingChatOverlay?.roomId,
+    isAppForeground,
+    isBootstrapping,
+    isLanguageBootstrapping,
+    showIncomingOverlay,
+  ]);
 
   /**
    * Killed / cold start: intent extras + AsyncStorage are often ready only after
@@ -281,6 +358,8 @@ export function RootNavigator() {
 
   const onIncomingOverlayAccept = useCallback(
     (p: OrderStackParamList['IncomingChatRequest']) => {
+      markIncomingRoomHandled(p.roomId);
+      lastSocketOverlayRoomRef.current = p.roomId;
       foregroundIncomingOverlayActiveRef.current = false;
       setIncomingChatOverlay(null);
       void cancelIncomingChatNotifications();
@@ -293,6 +372,8 @@ export function RootNavigator() {
 
   const onIncomingOverlayReject = useCallback(
     (p: OrderStackParamList['IncomingChatRequest']) => {
+      markIncomingRoomHandled(p.roomId);
+      lastSocketOverlayRoomRef.current = p.roomId;
       foregroundIncomingOverlayActiveRef.current = false;
       setIncomingChatOverlay(null);
       void cancelIncomingChatNotifications();
@@ -342,8 +423,7 @@ export function RootNavigator() {
         canEnterMainApp,
       );
       if (overlayParams) {
-        foregroundIncomingOverlayActiveRef.current = true;
-        setIncomingChatOverlay(overlayParams);
+        showIncomingOverlay(overlayParams, source);
       }
     };
 
@@ -373,8 +453,7 @@ export function RootNavigator() {
            * Foreground astrologer: skip the system notification entirely and
            * pop the in-app overlay (it owns the ringtone + vibration loop).
            */
-          foregroundIncomingOverlayActiveRef.current = true;
-          setIncomingChatOverlay(overlayParams);
+          showIncomingOverlay(overlayParams, 'fcm-foreground');
           return;
         }
 
@@ -417,6 +496,7 @@ export function RootNavigator() {
     isLanguageBootstrapping,
     canEnterMainApp,
     isAppForeground,
+    showIncomingOverlay,
   ]);
 
   /**
@@ -460,8 +540,7 @@ export function RootNavigator() {
         canEnterMainApp,
       );
       if (params) {
-        foregroundIncomingOverlayActiveRef.current = true;
-        setIncomingChatOverlay(params);
+        showIncomingOverlay(params, source);
       }
     };
 
@@ -485,7 +564,7 @@ export function RootNavigator() {
               cancelIncomingChatNotifications(),
               stopIncomingChatNative(),
             ]);
-            foregroundIncomingOverlayActiveRef.current = false;
+            lastSocketOverlayRoomRef.current = null;
             setIncomingChatOverlay(null);
             const params = await resolveIncomingChatParams(flat, {
               consumePending: true,
@@ -512,7 +591,13 @@ export function RootNavigator() {
     });
 
     return () => unsub();
-  }, [dispatch, isBootstrapping, isLanguageBootstrapping, canEnterMainApp]);
+  }, [
+    dispatch,
+    isBootstrapping,
+    isLanguageBootstrapping,
+    canEnterMainApp,
+    showIncomingOverlay,
+  ]);
 
   useEffect(() => {
     flushPendingWaitlistFcmNavigation(canEnterMainApp);
@@ -621,7 +706,7 @@ export function RootNavigator() {
 
   useEffect(() => {
     if (!canEnterMainApp && incomingChatOverlay) {
-      foregroundIncomingOverlayActiveRef.current = false;
+      lastSocketOverlayRoomRef.current = null;
       setIncomingChatOverlay(null);
     }
   }, [canEnterMainApp, incomingChatOverlay]);

@@ -9,6 +9,7 @@ import {
   setSocketChatDisconnect,
 } from '../../store/slices/socketSlice';
 import { ensureSessionForIncomingChatDecision } from './ensureSessionForIncomingChatDecision';
+import { markIncomingRoomHandled } from './foregroundIncomingOverlay';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
   openConsultationChatScreen,
@@ -26,6 +27,10 @@ const MAX_NAV_RETRIES = 150;
 /** Headless task + MainActivity probe can both fire Accept — emit socket events once. */
 const acceptEventsEmittedForRoom = new Set<string>();
 const acceptFlowInFlightForRoom = new Set<string>();
+
+export function isIncomingChatAcceptInFlight(roomId: string): boolean {
+  return acceptFlowInFlightForRoom.has(roomId.trim());
+}
 
 function markAcceptEventsEmitted(roomId: string): void {
   acceptEventsEmittedForRoom.add(roomId);
@@ -137,6 +142,7 @@ export async function acceptIncomingChatFromPush(
     return;
   }
 
+  markIncomingRoomHandled(p.roomId);
   await setPendingIncomingChatAccept(p);
 
   if (acceptFlowInFlightForRoom.has(p.roomId)) {
@@ -204,6 +210,7 @@ export async function rejectIncomingChatFromPush(
     return;
   }
 
+  markIncomingRoomHandled(p.roomId);
   const sessionReady = await ensureSessionForIncomingChatDecision();
   if (!sessionReady) {
     fcmTraceError('rejectIncomingChatFromPush: socket not ready room=', p.roomId);

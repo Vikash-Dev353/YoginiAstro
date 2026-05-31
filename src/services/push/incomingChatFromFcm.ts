@@ -44,48 +44,71 @@ function normalizeEventLabel(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
 }
 
+/** Map snake_case / alternate FCM keys to the camelCase fields the app expects. */
+export function normalizeIncomingChatData(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const roomId = raw.roomId ?? raw.room_id ?? raw.roomID;
+  const senderId =
+    raw.senderId ??
+    raw.sender_id ??
+    raw.from ??
+    raw.userId ??
+    raw.user_id ??
+    raw.customerId ??
+    raw.customer_id ??
+    raw.mobile;
+  const customerName =
+    raw.customerName ??
+    raw.customer_name ??
+    raw.userName ??
+    raw.user_name ??
+    raw.senderName ??
+    raw.sender_name;
+  const customerImage =
+    raw.customerImage ??
+    raw.customer_image ??
+    raw.profileImage ??
+    raw.profile_image ??
+    raw.senderImage ??
+    raw.sender_image;
+
+  return {
+    ...raw,
+    ...(roomId != null && String(roomId).trim()
+      ? { roomId: String(roomId).trim() }
+      : {}),
+    ...(senderId != null && String(senderId).trim()
+      ? {
+          senderId: String(senderId).trim(),
+          from:
+            raw.from != null && String(raw.from).trim()
+              ? String(raw.from).trim()
+              : String(senderId).trim(),
+        }
+      : {}),
+    ...(customerName != null && String(customerName).trim()
+      ? { customerName: String(customerName) }
+      : {}),
+    ...(customerImage != null && String(customerImage).trim()
+      ? { customerImage: String(customerImage) }
+      : {}),
+  };
+}
+
 /**
- * Returns true when the payload looks like an incoming chat request, even if
- * backend uses `type: 'general'` and only sets `event: 'incoming_chat'`.
- *
- * Detection precedence:
- *   1. Explicit non-chat types (waitlist) → always false.
- *   2. Explicit chat type/event values → true.
- *   3. Heuristic: has `roomId` AND a sender identifier AND backend didn't say
- *      it's something else.
+ * Returns true when the payload looks like an incoming chat request.
+ * Backend may send `type: waitlist_update` + `navigateTo: waitlist` together with
+ * `roomId` / `senderId` — those must still ring (only count-only waitlist pings do not).
  */
 export function isIncomingChatPayload(
   data: Record<string, unknown> | undefined | null,
 ): boolean {
   if (!data) return false;
-  const typeRaw = normalizeEventLabel(data.type);
-  const eventRaw = normalizeEventLabel(data.event);
-
-  if (EXPLICIT_NON_CHAT_TYPES.has(typeRaw) || EXPLICIT_NON_CHAT_TYPES.has(eventRaw)) {
-    return false;
-  }
-  // const navigateTo = normalizeEventLabel(data.navigateTo);
-  // if (navigateTo.includes('waitlist')) {
-  //   return false;
-  // }
-
-  const navigateTo = normalizeEventLabel(data.navigateTo);
-
-  /**
-   * Only block pure waitlist update notifications.
-   * Incoming chat notifications are ALSO routed to /waitlist
-   * so we must not reject them here.
-   */
-  const isExplicitWaitlistUpdate =
-    EXPLICIT_NON_CHAT_TYPES.has(typeRaw) ||
-    EXPLICIT_NON_CHAT_TYPES.has(eventRaw);
-
-  if (
-    isExplicitWaitlistUpdate &&
-    navigateTo.includes('waitlist')
-  ) {
-    return false;
-  }
+  const normalized = normalizeIncomingChatData(data);
+  const typeRaw = normalizeEventLabel(normalized.type);
+  const eventRaw = normalizeEventLabel(normalized.event);
+  const navigateTo = normalizeEventLabel(normalized.navigateTo);
 
   if (
     INCOMING_CHAT_EVENT_VALUES.has(typeRaw) ||
@@ -94,11 +117,28 @@ export function isIncomingChatPayload(
     return true;
   }
 
-  const roomId = String(data.roomId ?? '').trim();
+  const roomId = String(normalized.roomId ?? '').trim();
   const senderId = String(
-    data.senderId ?? data.from ?? data.userId ?? data.customerId ?? data.mobile ?? '',
+    normalized.senderId ??
+      normalized.from ??
+      normalized.userId ??
+      normalized.customerId ??
+      normalized.mobile ??
+      '',
   ).trim();
-  return !!(roomId && senderId);
+  if (roomId && senderId) {
+    return true;
+  }
+
+  if (
+    EXPLICIT_NON_CHAT_TYPES.has(typeRaw) ||
+    EXPLICIT_NON_CHAT_TYPES.has(eventRaw) ||
+    navigateTo.includes('waitlist')
+  ) {
+    return false;
+  }
+
+  return false;
 }
 
 /**
@@ -120,7 +160,9 @@ export function applyIncomingChatFromFcm(
   dispatch: AppDispatch,
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
 ): boolean {
-  const data = remoteMessage.data ?? {};
+  const data = normalizeIncomingChatData(
+    (remoteMessage.data ?? {}) as Record<string, unknown>,
+  );
 
   console.log('remoteMessage data===>>>>>', remoteMessage)
 
@@ -136,7 +178,7 @@ export function applyIncomingChatFromFcm(
     'senderId=',
     String(data.senderId ?? data.from ?? ''),
   );
-  if (!isIncomingChatPayload(data as Record<string, unknown>)) {
+  if (!isIncomingChatPayload(data)) {
     fcmTrace('applyIncomingChatFromFcm SKIP (not an incoming-chat payload)');
     return false;
   }
@@ -279,11 +321,36 @@ export function handleIncomingChatNotificationOpen(
   return getIncomingChatParamsFromRemoteMessage(message);
 }
 
+export function getIncomingChatParamsFromChatRequestItem(
+  item: ChatRequestItem,
+): OrderStackParamList['IncomingChatRequest'] | null {
+  if (!item?.roomId) {
+    return null;
+  }
+  return getIncomingChatParamsFromRemoteMessage({
+    data: normalizeIncomingChatData({
+      type: 'incoming_chat',
+      roomId: item.roomId,
+      senderId: item.senderId ?? item.from,
+      from: item.from ?? item.senderId,
+      customerName: item.userData?.fullName ?? item.senderName,
+      message: item.message,
+      customerImage: item.userData?.profileImage ?? item.senderImage,
+      kundliUrl: item.kundliUrl,
+      subtitle: item.subtitle,
+      userBalance: item.balance?.balance,
+      astroPrice: item.astroData?.price,
+    }),
+  } as FirebaseMessagingTypes.RemoteMessage);
+}
+
 export function getIncomingChatParamsFromRemoteMessage(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
 ): OrderStackParamList['IncomingChatRequest'] | null {
-  const data = remoteMessage.data ?? {};
-  if (!isIncomingChatPayload(data as Record<string, unknown>)) {
+  const data = normalizeIncomingChatData(
+    (remoteMessage.data ?? {}) as Record<string, unknown>,
+  );
+  if (!isIncomingChatPayload(data)) {
     return null;
   }
 
@@ -402,6 +469,9 @@ export function getIncomingChatParamsFromRemoteMessage(
 }
 
 function isWaitlistUpdatePayload(data: Record<string, string>): boolean {
+  if (isIncomingChatPayload(data as Record<string, unknown>)) {
+    return false;
+  }
   const typeRaw = String(data.type ?? '').trim().toLowerCase();
   const eventRaw = String(data.event ?? '').trim().toLowerCase();
   const navigateTo = String(data.navigateTo ?? '').toLowerCase();

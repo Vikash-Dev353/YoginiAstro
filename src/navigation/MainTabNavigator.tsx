@@ -9,7 +9,11 @@ import { images } from '../assets/images';
 import { colors } from '../constants/colors';
 import { useTranslation } from '../localization/useTranslation';
 import { parseKundliUrlToPayload } from '../services/api/astroApi';
-import { foregroundIncomingOverlayActiveRef } from '../services/push/foregroundIncomingOverlay';
+import {
+  foregroundIncomingOverlayActiveRef,
+  isIncomingRoomHandled,
+} from '../services/push/foregroundIncomingOverlay';
+import { isIncomingChatAcceptInFlight } from '../services/push/incomingChatAcceptFlow';
 import { selectChatRequests } from '../store/slices/socketSlice';
 import { useAppSelector } from '../store/hooks';
 import { HomeStackNavigator } from './HomeStackNavigator';
@@ -38,10 +42,19 @@ const CustomTabBar = memo(
         lastNotifiedRoomIdRef.current = null;
         return;
       }
+      if (
+        isIncomingRoomHandled(firstRequest.roomId) ||
+        isIncomingChatAcceptInFlight(firstRequest.roomId)
+      ) {
+        return;
+      }
       if (firstRequest.roomId === lastNotifiedRoomIdRef.current) {
         return;
       }
-      if (nestedRouteName === 'ConsultationChat') {
+      if (
+        nestedRouteName === 'ConsultationChat' ||
+        nestedRouteName === 'IncomingChatRequest'
+      ) {
         return;
       }
 
