@@ -2,9 +2,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
-  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -20,10 +20,8 @@ import { ProfileStackParamList } from '../../navigation/types';
 import { astroApi } from '../../services/api/astroApi';
 import { useAppSelector } from '../../store/hooks';
 import type { MonthlyPayoutItem } from '../../types/monthlyPayout';
-import {
-  extractMonthlyReportDownloadUrl,
-  mapMonthlyReportsResponse,
-} from '../../utils/monthlyPayoutMapper';
+import { downloadAstrologerMonthlyReport } from '../../utils/downloadAstrologerReport';
+import { mapMonthlyReportsResponse } from '../../utils/monthlyPayoutMapper';
 import { hp, normalizeFont, wp } from '../../utils/responsive';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'MonthlyPayout'>;
@@ -42,6 +40,7 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [payouts, setPayouts] = useState<MonthlyPayoutItem[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const loadInFlightRef = useRef(false);
   const hasLoadedRef = useRef(false);
 
@@ -94,25 +93,7 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
 
   const onDownload = useCallback(
     async (item: MonthlyPayoutItem) => {
-      let url = item.downloadUrl?.trim();
-
-      if (!url && item.month != null && item.year != null && astroId) {
-        try {
-          const response = await astroApi.getMonthlyReports(astroId, {
-            month: item.month,
-            year: item.year,
-          });
-          url = extractMonthlyReportDownloadUrl(response) ?? undefined;
-        } catch {
-          Alert.alert(
-            t('monthlyPayout.downloadUnavailableTitle'),
-            t('monthlyPayout.downloadFailed'),
-          );
-          return;
-        }
-      }
-
-      if (!url) {
+      if (!token || !astroId) {
         Alert.alert(
           t('monthlyPayout.downloadUnavailableTitle'),
           t('monthlyPayout.downloadUnavailable'),
@@ -120,22 +101,48 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
         return;
       }
 
-      try {
-        await Linking.openURL(url);
-      } catch {
+      if (item.month == null || item.year == null) {
         Alert.alert(
           t('monthlyPayout.downloadUnavailableTitle'),
-          t('monthlyPayout.downloadFailed'),
+          t('monthlyPayout.downloadUnavailable'),
         );
+        return;
+      }
+
+      if (downloadingId) {
+        return;
+      }
+
+      setDownloadingId(item.id);
+      try {
+        // Let React paint the row spinner before the download work starts.
+        await new Promise<void>(resolve => {
+          requestAnimationFrame(() => resolve());
+        });
+        await downloadAstrologerMonthlyReport({
+          astroId,
+          month: item.month,
+          year: item.year,
+          token,
+        });
+      } catch (error) {
+        Alert.alert(
+          t('monthlyPayout.downloadUnavailableTitle'),
+          (error as { message?: string })?.message ??
+            t('monthlyPayout.downloadFailed'),
+        );
+      } finally {
+        setDownloadingId(null);
       }
     },
-    [astroId, t],
+    [astroId, downloadingId, t, token],
   );
 
   const renderItem = useCallback(
     ({ item }: { item: MonthlyPayoutItem }) => {
       const isPaid = item.status === 'paid';
       const statusColor = isPaid ? styles.statusPaid : styles.statusPending;
+      const isDownloading = downloadingId === item.id;
 
       return (
         <View style={styles.card}>
@@ -151,19 +158,28 @@ export function MonthlyPayoutScreen({ navigation }: Props) {
 
           <Pressable
             onPress={() => onDownload(item)}
+            disabled={isDownloading || downloadingId != null}
             style={({ pressed }) => [
               styles.downloadButton,
-              pressed && styles.downloadPressed,
+              (pressed || isDownloading) && styles.downloadPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('monthlyPayout.download')}
+            accessibilityLabel={
+              isDownloading
+                ? t('monthlyPayout.downloading')
+                : t('monthlyPayout.download')
+            }
           >
-            <DownloadIcon size={30} color="#3B2222" />
+            {isDownloading ? (
+              <ActivityIndicator size="small" color="#3B2222" />
+            ) : (
+              <DownloadIcon size={30} color="#3B2222" />
+            )}
           </Pressable>
         </View>
       );
     },
-    [onDownload, statusLabel, t],
+    [downloadingId, onDownload, statusLabel, t],
   );
 
   return (

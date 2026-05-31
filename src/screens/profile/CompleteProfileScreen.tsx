@@ -1247,7 +1247,30 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
           ]}
         >
           {isEditMode ? (
-            <Text style={styles.editHeadline}>{t('profile.editProfileHeadline')}</Text>
+            <>
+              <Text style={styles.editHeadline}>{t('profile.editProfileHeadline')}</Text>
+              <View style={styles.editAvatarSection}>
+                <View style={styles.avatarRing}>
+                  <Image
+                    source={
+                      displayImageUri(profileImageUri)
+                        ? { uri: displayImageUri(profileImageUri)! }
+                        : images.logo
+                    }
+                    style={styles.avatarImg}
+                    resizeMode={displayImageUri(profileImageUri) ? 'cover' : 'contain'}
+                  />
+                </View>
+                <Pressable
+                  style={styles.cameraBadge}
+                  onPress={onUploadProfilePhoto}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('completeProfile.uploadPhoto')}
+                >
+                  <Text style={styles.cameraIcon}>📷</Text>
+                </Pressable>
+              </View>
+            </>
           ) : (
             <View style={styles.header}>
               <ImageBackground
@@ -1282,15 +1305,17 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
             </View>
           )}
 
-          <View style={styles.card}>
-            <Text style={styles.uploadLabel}>
-              {t('completeProfile.uploadPhoto')}
-              <Text style={styles.req}>*</Text>
-            </Text>
+          <View style={[styles.card, isEditMode && styles.cardEditMode]}>
+            {!isEditMode ? (
+              <Text style={styles.uploadLabel}>
+                {t('completeProfile.uploadPhoto')}
+                <Text style={styles.req}>*</Text>
+              </Text>
+            ) : null}
             {isLoadingProfile ? (
               <Text style={styles.previewText}>Loading profile...</Text>
             ) : null}
-            {profileImageUri ? (
+            {!isEditMode && profileImageUri ? (
               <Text style={styles.previewText}>Photo selected</Text>
             ) : null}
 
@@ -1842,7 +1867,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingHorizontal: wp(4),
     paddingTop: hp(1.5),
-    paddingBottom: hp(1),
+    paddingBottom: hp(0.5),
+  },
+  editAvatarSection: {
+    alignSelf: 'center',
+    marginBottom: hp(1),
+    marginTop: hp(0.5),
   },
   avatarWrap: {
     position: 'absolute',
@@ -1891,6 +1921,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingTop: hp(3),
     paddingBottom: hp(3),
+  },
+  cardEditMode: {
+    marginTop: hp(1),
   },
   uploadLabel: {
     textAlign: 'center',

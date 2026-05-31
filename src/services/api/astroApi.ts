@@ -518,6 +518,18 @@ const optionalProfileString = (value: unknown): string | undefined => {
   return text.length > 0 ? text : undefined;
 };
 
+/** Backend may return http:// — Android blocks cleartext image loads by default. */
+const normalizeProfileMediaUrl = (value: unknown): string | undefined => {
+  const text = optionalProfileString(value);
+  if (!text) {
+    return undefined;
+  }
+  if (/^http:\/\//i.test(text) && /yoginiastro\.com/i.test(text)) {
+    return text.replace(/^http:\/\//i, 'https://');
+  }
+  return text;
+};
+
 const isProfileLikeRecord = (value: Record<string, unknown>): boolean =>
   Boolean(
     value.name ||
@@ -552,12 +564,12 @@ export function normalizeAstroProfileFromApi(
     state: optionalProfileString(raw.state),
     country: optionalProfileString(raw.country),
     pincode: optionalProfileString(raw.pincode ?? raw.pin_code),
-    profileImage: optionalProfileString(
+    profileImage: normalizeProfileMediaUrl(
       raw.profileImage ?? raw.profile_image ?? raw.profilePhoto ?? raw.profile_photo,
     ),
-    aadhar: optionalProfileString(raw.aadhar ?? raw.aadhaar ?? raw.aadharCard),
-    pan: optionalProfileString(raw.pan ?? raw.panCard),
-    passBookOrCancelledCheque: optionalProfileString(
+    aadhar: normalizeProfileMediaUrl(raw.aadhar ?? raw.aadhaar ?? raw.aadharCard),
+    pan: normalizeProfileMediaUrl(raw.pan ?? raw.panCard),
+    passBookOrCancelledCheque: normalizeProfileMediaUrl(
       raw.passBookOrCancelledCheque ??
         raw.passbook ??
         raw.pass_book ??
@@ -729,6 +741,21 @@ export const astroApi = {
     }
     return request;
   },
+  getAstrologerReport: (
+    astroId: string,
+    params: { month: number; year: number },
+  ) =>
+    apiClient
+      .get<GetMonthlyReportsResponse>(
+        API_ROUTES.auth.getAstrologerReport(astroId.trim().toUpperCase()),
+        {
+          params: {
+            month: params.month,
+            year: params.year,
+          },
+        },
+      )
+      .then(response => response.data),
   getRecentConsultations: async (
     astroId: string,
     limit: number = 20,

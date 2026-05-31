@@ -125,6 +125,9 @@ function extractDownloadUrl(record: MonthlyReportApiItem): string | null {
     'url',
     'payslipUrl',
     'payoutUrl',
+    'invoiceUrl',
+    'reportLink',
+    'filePath',
   ]);
 }
 

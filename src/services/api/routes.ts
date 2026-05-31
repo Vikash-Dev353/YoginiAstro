@@ -9,6 +9,8 @@ export const API_ROUTES = {
     waitlist: (astroId: string) => `/astro/waitlist/${astroId}`,
     getMonthlyEarnings: "/astro/get-monthly-earnings",
     monthlyReports: (astroId: string) => `/astro/monthly-reports/${astroId}`,
+    getAstrologerReport: (astroId: string) =>
+      `/invoice/get-astrologer-report/${astroId}`,
     getLatestReviews: "/astro/get-latest-reviews",
     getProfile: "/astro/get-profile",
     updateProfile: "/astro/update-profile",

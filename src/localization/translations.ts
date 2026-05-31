@@ -111,6 +111,7 @@ export const translations = {
       pending: 'Pending',
       download: 'Download payout',
       loading: 'Loading payouts...',
+      downloading: 'Downloading report...',
       empty: 'No monthly payouts found.',
       downloadUnavailableTitle: 'Download unavailable',
       downloadUnavailable: 'Payout document is not available yet.',
@@ -317,6 +318,7 @@ export const translations = {
       pending: 'लंबित',
       download: 'भुगतान डाउनलोड करें',
       loading: 'भुगतान लोड हो रहा है...',
+      downloading: 'रिपोर्ट डाउनलोड हो रही है...',
       empty: 'कोई मासिक भुगतान नहीं मिला।',
       downloadUnavailableTitle: 'डाउनलोड उपलब्ध नहीं',
       downloadUnavailable: 'भुगतान दस्तावेज़ अभी उपलब्ध नहीं है।',
@@ -505,6 +507,7 @@ export type TranslationKey =
   | 'monthlyPayout.pending'
   | 'monthlyPayout.download'
   | 'monthlyPayout.loading'
+  | 'monthlyPayout.downloading'
   | 'monthlyPayout.empty'
   | 'monthlyPayout.downloadUnavailableTitle'
   | 'monthlyPayout.downloadUnavailable'
