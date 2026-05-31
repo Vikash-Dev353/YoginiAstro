@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -15,10 +16,11 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class IncomingChatModule(
   private val reactContext: ReactApplicationContext,
-) : ReactContextBaseJavaModule(reactContext), ActivityEventListener {
+) : ReactContextBaseJavaModule(reactContext), ActivityEventListener, LifecycleEventListener {
 
   init {
     reactContext.addActivityEventListener(this)
+    reactContext.addLifecycleEventListener(this)
   }
 
   override fun getName(): String = NAME
@@ -144,25 +146,65 @@ class IncomingChatModule(
   }
 
   /**
-   * `singleTask` MainActivity gets `onNewIntent` (proxied here as `onNewIntent`)
-   * when the service launches it while the app is already running. Forward the
-   * payload to JS so the overlay pops without needing a remount.
+   * Cold start after notification Accept/Decline — `onNewIntent` can fire before JS
+   * listeners exist. Only replay explicit decisions here; ringing incoming-chat is
+   * handled by `onNewIntent` + the overlay probe (must not stop the foreground service
+   * on every resume or the tray notification disappears before login/bootstrap finishes).
+   */
+  override fun onHostResume() {
+    val activity = reactContext.currentActivity ?: return
+    val intent = activity.intent ?: return
+    val decision = intent.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
+    if (decision != "accept" && decision != "reject") {
+      return
+    }
+    forwardLaunchIntent(intent, "onHostResume")
+  }
+
+  override fun onHostPause() {
+    /* Not used. */
+  }
+
+  override fun onHostDestroy() {
+    /* Not used. */
+  }
+
+  /**
+   * `singleTask` MainActivity gets `onNewIntent` when the service launches it
+   * while the app is already running. Forward payload to JS for Accept/Reject.
    */
   override fun onNewIntent(intent: Intent) {
-    if (intent.action != IncomingChatService.ACTION_INCOMING_CHAT) {
+    forwardLaunchIntent(intent, "onNewIntent")
+  }
+
+  private fun forwardLaunchIntent(intent: Intent?, source: String) {
+    if (intent == null) {
       return
     }
     val decision = intent.getStringExtra("incomingChatDecision")
+    val isIncoming =
+      intent.action == IncomingChatService.ACTION_INCOMING_CHAT ||
+        decision != null
+    if (!isIncoming) {
+      return
+    }
+
     val payload = mergePayloadMaps(
       IncomingChatPayloadStore.load(reactApplicationContext),
       IncomingChatPayloadStore.readFromIntent(intent),
-    ) ?: return
+    ) ?: Arguments.createMap()
+
     if (decision != null) {
       payload.putString("incomingChatDecision", decision)
     }
+
+    if (!payload.keySetIterator().hasNextKey() && decision == null) {
+      return
+    }
+
     Log.d(
       TAG,
-      "onNewIntent → emitting $EVENT_INCOMING_CHAT decision=" + (decision ?: ""),
+      "$source → emitting $EVENT_INCOMING_CHAT decision=" + (decision ?: ""),
     )
     reactContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)

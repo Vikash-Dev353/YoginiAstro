@@ -1,6 +1,4 @@
-import { CommonActions } from '@react-navigation/native';
 import type { OrderStackParamList } from '../../navigation/types';
-import { navigationRef } from '../../navigation/navigationRef';
 import type { AppDispatch } from '../../store';
 import {
   acceptChat,
@@ -10,16 +8,20 @@ import {
   setChatStarted,
   setSocketChatDisconnect,
 } from '../../store/slices/socketSlice';
-import { canEnterMainAppFromAuthState, ensureSessionForIncomingChatDecision } from './ensureSessionForIncomingChatDecision';
+import { ensureSessionForIncomingChatDecision } from './ensureSessionForIncomingChatDecision';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
+import {
+  openConsultationChatScreen,
+  requestConsultationChatNavigation,
+} from './incomingChatNavigation';
 import {
   clearPendingIncomingChatAccept,
   peekPendingIncomingChatAccept,
   setPendingIncomingChatAccept,
 } from './pendingIncomingChatAccept';
 
-const NAV_RETRY_MS = 150;
-const MAX_NAV_RETRIES = 120;
+const NAV_RETRY_MS = 200;
+const MAX_NAV_RETRIES = 150;
 
 /** Headless task + MainActivity probe can both fire Accept — emit socket events once. */
 const acceptEventsEmittedForRoom = new Set<string>();
@@ -52,79 +54,25 @@ function emitAstrologerJoinedChatEvents(
   );
 }
 
-function buildConsultationChatParams(
-  p: OrderStackParamList['IncomingChatRequest'],
-  from: string,
-) {
-  return {
-    customerName: p.customerName,
-    roomId: p.roomId,
-    senderId: from,
-    kundaliPayload: p.kundaliPayload,
-    customerImage: p.customerImage ?? undefined,
-  };
-}
-
-/** True when MainTabNavigator is mounted (Order tab exists in root state). */
-function isMainTabNavigationReady(): boolean {
-  if (!navigationRef.isReady()) {
-    return false;
-  }
-  const routes = navigationRef.getRootState()?.routes ?? [];
-  return routes.some(route => route.name === 'Order');
-}
-
-/**
- * Open ConsultationChat on the Order tab.
- * Must not run while AuthNavigator is still shown — dispatch would no-op.
- */
-function dispatchConsultationChatNav(
-  p: OrderStackParamList['IncomingChatRequest'],
-  from: string,
-): boolean {
-  if (!canEnterMainAppFromAuthState()) {
-    fcmTrace('dispatchConsultationChatNav: defer — auth/main app not ready room=', p.roomId);
-    return false;
-  }
-  if (!isMainTabNavigationReady()) {
-    fcmTrace('dispatchConsultationChatNav: defer — Order tab not mounted room=', p.roomId);
-    return false;
-  }
-
-  const chatParams = buildConsultationChatParams(p, from);
-  navigationRef.dispatch(
-    CommonActions.navigate({
-      name: 'Order',
-      params: {
-        screen: 'ConsultationChat',
-        params: chatParams,
-      },
-    }),
-  );
-  fcmTrace('dispatchConsultationChatNav: OK room=', p.roomId);
-  return true;
-}
-
 function tryNavigateAfterAccept(
   p: OrderStackParamList['IncomingChatRequest'],
-  from: string,
 ): void {
-  if (dispatchConsultationChatNav(p, from)) {
+  if (openConsultationChatScreen(p)) {
     void clearPendingIncomingChatAccept();
     fcmTrace('tryNavigateAfterAccept: immediate room=', p.roomId);
     return;
   }
-  navigateToConsultationChat(p, from);
+  requestConsultationChatNavigation(p);
+  navigateToConsultationChat(p);
 }
 
 export function navigateToConsultationChat(
   p: OrderStackParamList['IncomingChatRequest'],
-  from: string,
 ): void {
   let attempts = 0;
   const tryNav = () => {
     attempts += 1;
-    if (dispatchConsultationChatNav(p, from)) {
+    if (openConsultationChatScreen(p)) {
       fcmTrace('navigateToConsultationChat OK room=', p.roomId, 'attempt=', attempts);
       void clearPendingIncomingChatAccept();
       return;
@@ -138,6 +86,7 @@ export function navigateToConsultationChat(
       p.roomId,
     );
     void setPendingIncomingChatAccept(p);
+    requestConsultationChatNavigation(p);
   };
   tryNav();
 }
@@ -188,18 +137,17 @@ export async function acceptIncomingChatFromPush(
     return;
   }
 
+  await setPendingIncomingChatAccept(p);
+
   if (acceptFlowInFlightForRoom.has(p.roomId)) {
     fcmTrace(
-      'acceptIncomingChatFromPush: in flight — nav retry in main context room=',
+      'acceptIncomingChatFromPush: in flight — nav retry room=',
       p.roomId,
     );
-    await setPendingIncomingChatAccept(p);
-    tryNavigateAfterAccept(p, from);
+    tryNavigateAfterAccept(p);
     return;
   }
   acceptFlowInFlightForRoom.add(p.roomId);
-
-  await setPendingIncomingChatAccept(p);
 
   try {
     const applied = await applyIncomingChatAccept(dispatch, p);
@@ -211,7 +159,7 @@ export async function acceptIncomingChatFromPush(
       return;
     }
 
-    tryNavigateAfterAccept(p, from);
+    tryNavigateAfterAccept(p);
   } finally {
     acceptFlowInFlightForRoom.delete(p.roomId);
   }
@@ -236,8 +184,7 @@ export async function flushPendingIncomingChatAccept(
     }
   }
 
-  const from = pending.from.trim();
-  if (!dispatchConsultationChatNav(pending, from)) {
+  if (!openConsultationChatScreen(pending)) {
     fcmTrace('flushPendingIncomingChatAccept: nav deferred room=', pending.roomId);
     return false;
   }

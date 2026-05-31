@@ -5,6 +5,7 @@ import notifee, { EventType } from '@notifee/react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
+  DeviceEventEmitter,
   Linking,
   Modal,
   Pressable,
@@ -46,6 +47,11 @@ import {
   flushPendingIncomingChatAccept,
   rejectIncomingChatFromPush,
 } from '../services/push/incomingChatAcceptFlow';
+import {
+  INCOMING_CHAT_OPEN_CONSULTATION_EVENT,
+  openConsultationChatScreen,
+} from '../services/push/incomingChatNavigation';
+import { clearPendingIncomingChatAccept } from '../services/push/pendingIncomingChatAccept';
 import { resolveIncomingChatParams } from '../services/push/resolveIncomingChatParams';
 import {
   clearPendingIncomingChat,
@@ -194,22 +200,23 @@ export function RootNavigator() {
         'decision=',
         launch.decision ?? '(none)',
       );
-      void cancelIncomingChatNotifications();
-      void stopIncomingChatNative();
       if (launch.decision === 'accept') {
+        void cancelIncomingChatNotifications();
+        void stopIncomingChatNative();
         foregroundIncomingOverlayActiveRef.current = false;
         setIncomingChatOverlay(null);
         void acceptIncomingChatFromPush(dispatch, launch.params);
         return;
       }
       if (launch.decision === 'reject') {
+        void cancelIncomingChatNotifications();
+        void stopIncomingChatNative();
         if (canEnterMainApp) {
           void rejectIncomingChatFromPush(dispatch, launch.params);
         }
         return;
       }
       if (canEnterMainApp) {
-        foregroundIncomingOverlayActiveRef.current = true;
         showIncomingOverlay(launch.params, 'native-intent');
       }
     });
@@ -548,6 +555,69 @@ export function RootNavigator() {
     }, 100);
     return () => clearTimeout(timer);
   }, [appState, canEnterMainApp, dispatch]);
+
+  /**
+   * Headless / background Accept emits this event — navigate in the main React tree
+   * (navigationRef does not work reliably from Headless JS).
+   */
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      INCOMING_CHAT_OPEN_CONSULTATION_EVENT,
+      (p: OrderStackParamList['IncomingChatRequest']) => {
+        fcmTrace(
+          'RootNavigator: openConsultationChat event room=',
+          p?.roomId ?? '(none)',
+        );
+        if (!p?.roomId || !p.from?.trim()) {
+          return;
+        }
+        if (openConsultationChatScreen(p)) {
+          void clearPendingIncomingChatAccept();
+          return;
+        }
+        void flushPendingIncomingChatAccept(dispatch);
+      },
+    );
+    return () => sub.remove();
+  }, [canEnterMainApp, dispatch]);
+
+  /** Retry pending Accept → chat for a few seconds after unlock / resume. */
+  useEffect(() => {
+    if (
+      !canEnterMainApp ||
+      isBootstrapping ||
+      isLanguageBootstrapping ||
+      appState !== 'active'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    const tick = async () => {
+      if (cancelled || attempts >= maxAttempts) {
+        return;
+      }
+      attempts += 1;
+      const done = await flushPendingIncomingChatAccept(dispatch);
+      if (!done && !cancelled) {
+        setTimeout(() => void tick(), 200);
+      }
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    appState,
+    canEnterMainApp,
+    dispatch,
+    isBootstrapping,
+    isLanguageBootstrapping,
+  ]);
 
   useEffect(() => {
     if (!canEnterMainApp && incomingChatOverlay) {

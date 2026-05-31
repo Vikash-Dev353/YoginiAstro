@@ -19,11 +19,11 @@ object IncomingChatPayloadStore {
   fun looksLikeIncomingChat(data: Map<String, String>): Boolean {
     val type = data["type"]?.trim()?.lowercase().orEmpty()
     val event = data["event"]?.trim()?.lowercase().orEmpty()
-    if (
-      type.contains("waitlist") ||
-      event.contains("waitlist") ||
-      data["navigateTo"]?.contains("waitlist", ignoreCase = true) == true
-    ) {
+    val navigateTo = data["navigateTo"]?.trim()?.lowercase().orEmpty()
+    val isExplicitWaitlistUpdate =
+      type.contains("waitlist") || event.contains("waitlist")
+    // Incoming chat may also route to waitlist — only skip pure waitlist updates.
+    if (isExplicitWaitlistUpdate && navigateTo.contains("waitlist")) {
       return false
     }
     if (
