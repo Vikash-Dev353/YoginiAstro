@@ -260,11 +260,16 @@ export type IncomingChatLaunchConsume = {
 export function parseIncomingChatLaunchRaw(
   flat: Record<string, string>,
 ): IncomingChatLaunchConsume {
-  const decisionRaw = flat.incomingChatDecision?.trim().toLowerCase();
+  const decisionRaw = (
+    flat.incomingChatDecision ?? flat.incomingChatNotificationDecision
+  )
+    ?.trim()
+    .toLowerCase();
   const decision =
     decisionRaw === 'accept' || decisionRaw === 'reject' ? decisionRaw : undefined;
   const data = { ...flat };
   delete data.incomingChatDecision;
+  delete data.incomingChatNotificationDecision;
   const params = getIncomingChatParamsFromRemoteMessage({
     data,
   } as FirebaseMessagingTypes.RemoteMessage);

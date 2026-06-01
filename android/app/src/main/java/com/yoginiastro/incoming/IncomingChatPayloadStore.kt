@@ -88,6 +88,20 @@ object IncomingChatPayloadStore {
       .apply()
   }
 
+  /** Prevents probe / intent replay from re-showing the overlay after Accept. */
+  fun clearIncomingChatExtrasFromIntent(intent: Intent?) {
+    if (intent == null) {
+      return
+    }
+    readFromIntent(intent)?.keys?.forEach { key ->
+      intent.removeExtra(key)
+    }
+    intent.removeExtra("incomingChatDecision")
+    if (intent.action == IncomingChatService.ACTION_INCOMING_CHAT) {
+      intent.action = null
+    }
+  }
+
   fun readFromIntent(intent: Intent?): HashMap<String, String>? {
     val extras: Bundle = intent?.extras ?: return null
     val out = HashMap<String, String>()

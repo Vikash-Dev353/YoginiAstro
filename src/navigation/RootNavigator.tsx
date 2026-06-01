@@ -52,12 +52,17 @@ import {
   showLocalNotificationFromRemoteMessage,
 } from '../services/push/notificationDisplay';
 import {
+  acceptIncomingChatFromNotification,
   acceptIncomingChatFromPush,
   flushPendingIncomingChatAccept,
+  incomingChatAcceptNavigationPendingRef,
   rejectIncomingChatFromPush,
+  wasNotificationAcceptHandled,
 } from '../services/push/incomingChatAcceptFlow';
+import { peekPendingIncomingChatAccept } from '../services/push/pendingIncomingChatAccept';
 import {
   INCOMING_CHAT_OPEN_CONSULTATION_EVENT,
+  isConsultationChatNavigationDone,
   openConsultationChatScreen,
 } from '../services/push/incomingChatNavigation';
 import { clearPendingIncomingChatAccept } from '../services/push/pendingIncomingChatAccept';
@@ -66,8 +71,13 @@ import {
   clearPendingIncomingChat,
   setPendingIncomingChat,
 } from '../services/push/pendingIncomingChat';
-import { startIncomingChatOverlayProbe } from '../services/push/incomingChatOverlayProbe';
 import {
+  peekIncomingChatLaunch,
+  startIncomingChatOverlayProbe,
+} from '../services/push/incomingChatOverlayProbe';
+import {
+  clearIncomingChatPayloadNative,
+  consumeIncomingChatLaunchAction,
   startIncomingChatNative,
   stopIncomingChatNative,
   subscribeIncomingChatIntent,
@@ -112,6 +122,8 @@ export function RootNavigator() {
   >(null);
   const chatRequests = useAppSelector(selectChatRequests);
   const lastSocketOverlayRoomRef = useRef<string | null>(null);
+  /** Cold-start probe runs once — not again when overlay dismisses after Accept. */
+  const incomingOverlayProbeStartedRef = useRef(false);
 
   /** Keep MainTabNavigator in sync — ref must not stay true when overlay is hidden. */
   useEffect(() => {
@@ -123,6 +135,9 @@ export function RootNavigator() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
       setAppState(nextState);
+      if (nextState === 'background' || nextState === 'inactive') {
+        incomingOverlayProbeStartedRef.current = false;
+      }
     });
     return () => sub.remove();
   }, []);
@@ -138,16 +153,25 @@ export function RootNavigator() {
     void initializeLocalNotifications();
   }, []);
 
+  const shouldSkipIncomingOverlay = useCallback((roomId: string) => {
+    const id = roomId.trim();
+    return (
+      isIncomingRoomHandled(id) ||
+      isIncomingChatAcceptInFlight(id) ||
+      isConsultationChatNavigationDone(id) ||
+      wasNotificationAcceptHandled(id)
+    );
+  }, []);
+
   const showIncomingOverlay = useCallback(
     (params: OrderStackParamList['IncomingChatRequest'], source: string) => {
-      if (
-        isIncomingRoomHandled(params.roomId) ||
-        isIncomingChatAcceptInFlight(params.roomId)
-      ) {
+      if (shouldSkipIncomingOverlay(params.roomId)) {
         fcmTrace(
           'RootNavigator: skip overlay (handled/in-flight) room=',
           params.roomId,
         );
+        void stopIncomingChatNative();
+        void cancelIncomingChatNotifications();
         return;
       }
       fcmTrace('RootNavigator: show incoming overlay ←', source, 'room=', params.roomId);
@@ -157,7 +181,7 @@ export function RootNavigator() {
       void stopIncomingChatNative();
       setIncomingChatOverlay(params);
     },
-    [],
+    [shouldSkipIncomingOverlay],
   );
 
   /**
@@ -209,32 +233,94 @@ export function RootNavigator() {
   ]);
 
   /**
+   * Unlocked notification tap: app opens → show custom Accept/Reject (peek only;
+   * does not consume intent until user acts).
+   */
+  useEffect(() => {
+    if (
+      !canEnterMainApp ||
+      !isAppForeground ||
+      isBootstrapping ||
+      isLanguageBootstrapping
+    ) {
+      return;
+    }
+    void (async () => {
+      const launch = await peekIncomingChatLaunch();
+      if (!launch.params || launch.decision) {
+        return;
+      }
+      if (shouldSkipIncomingOverlay(launch.params.roomId)) {
+        return;
+      }
+      if (incomingChatOverlay?.roomId === launch.params.roomId) {
+        return;
+      }
+      showIncomingOverlay(launch.params, 'notification-tap');
+    })();
+  }, [
+    canEnterMainApp,
+    incomingChatOverlay?.roomId,
+    isAppForeground,
+    isBootstrapping,
+    isLanguageBootstrapping,
+    shouldSkipIncomingOverlay,
+    showIncomingOverlay,
+  ]);
+
+  /**
+   * Lock-screen Accept: MainActivity may start before bootstrap finishes.
+   * Re-read intent once the astrologer session is ready (probe may have stopped early).
+   */
+  useEffect(() => {
+    if (!canEnterMainApp || !isAppForeground || isBootstrapping || isLanguageBootstrapping) {
+      return;
+    }
+    void (async () => {
+      const launch = await consumeIncomingChatLaunchAction();
+      if (!launch.params || launch.decision !== 'accept') {
+        return;
+      }
+      fcmTrace('RootNavigator: deferred accept intent room=', launch.params.roomId);
+      setIncomingChatOverlay(null);
+      void acceptIncomingChatFromNotification(dispatch, launch.params);
+    })();
+  }, [
+    canEnterMainApp,
+    dispatch,
+    isAppForeground,
+    isBootstrapping,
+    isLanguageBootstrapping,
+  ]);
+
+  /**
    * Killed / cold start: intent extras + AsyncStorage are often ready only after
    * several frames. Retry until we can show the custom Accept/Reject screen.
    */
   useEffect(() => {
-    const probeEnabled =
-      isAppForeground &&
-      !isLanguageBootstrapping &&
-      (canEnterMainApp || isBootstrapping) &&
-      !incomingChatOverlay;
-
-    if (!probeEnabled) {
+    if (
+      !isAppForeground ||
+      isLanguageBootstrapping ||
+      (!canEnterMainApp && !isBootstrapping) ||
+      incomingOverlayProbeStartedRef.current
+    ) {
       return;
     }
+    incomingOverlayProbeStartedRef.current = true;
 
     return startIncomingChatOverlayProbe(
       launch => {
         if (!launch.params) {
           return;
         }
+        if (shouldSkipIncomingOverlay(launch.params.roomId)) {
+          return;
+        }
         if (launch.decision === 'accept') {
           fcmTrace('RootNavigator: probe → accept → ConsultationChat');
-          void cancelIncomingChatNotifications();
-          void stopIncomingChatNative();
           foregroundIncomingOverlayActiveRef.current = false;
           setIncomingChatOverlay(null);
-          void acceptIncomingChatFromPush(dispatch, launch.params);
+          void acceptIncomingChatFromNotification(dispatch, launch.params);
           return;
         }
         if (launch.decision === 'reject') {
@@ -254,10 +340,10 @@ export function RootNavigator() {
   }, [
     canEnterMainApp,
     dispatch,
-    incomingChatOverlay,
     isAppForeground,
     isBootstrapping,
     isLanguageBootstrapping,
+    shouldSkipIncomingOverlay,
     showIncomingOverlay,
   ]);
 
@@ -278,11 +364,9 @@ export function RootNavigator() {
         launch.decision ?? '(none)',
       );
       if (launch.decision === 'accept') {
-        void cancelIncomingChatNotifications();
-        void stopIncomingChatNative();
         foregroundIncomingOverlayActiveRef.current = false;
         setIncomingChatOverlay(null);
-        void acceptIncomingChatFromPush(dispatch, launch.params);
+        void acceptIncomingChatFromNotification(dispatch, launch.params);
         return;
       }
       if (launch.decision === 'reject') {
@@ -293,12 +377,12 @@ export function RootNavigator() {
         }
         return;
       }
-      if (canEnterMainApp) {
+      if (canEnterMainApp && !shouldSkipIncomingOverlay(launch.params.roomId)) {
         showIncomingOverlay(launch.params, 'native-intent');
       }
     });
     return () => sub?.remove();
-  }, [canEnterMainApp, dispatch, showIncomingOverlay]);
+  }, [canEnterMainApp, dispatch, shouldSkipIncomingOverlay, showIncomingOverlay]);
 
   useEffect(() => {
     let active = true;
@@ -329,16 +413,34 @@ export function RootNavigator() {
   }, [canEnterMainApp, token, astroId]);
 
   useEffect(() => {
-    const resolvedAstroId = astroId?.trim() || decodeAstroIdFromToken(token) || '';
-    if (token && resolvedAstroId && isAppForeground) {
-      dispatch(
-        syncSocketSession({
-          authToken: token,
-          astroId: resolvedAstroId,
-          reason: 'connect-ready',
-        }),
-      );
-    } else {
+    let cancelled = false;
+
+    const syncSocketForSession = async () => {
+      const resolvedAstroId = astroId?.trim() || decodeAstroIdFromToken(token) || '';
+      const pendingAccept = await peekPendingIncomingChatAccept();
+      if (cancelled) {
+        return;
+      }
+
+      const keepSocketAlive =
+        Boolean(token && resolvedAstroId) &&
+        (isAppForeground ||
+          incomingChatAcceptNavigationPendingRef.current ||
+          Boolean(pendingAccept));
+
+      if (keepSocketAlive) {
+        dispatch(
+          syncSocketSession({
+            authToken: token,
+            astroId: resolvedAstroId,
+            reason: isAppForeground
+              ? 'connect-ready'
+              : 'incoming-chat-accept-pending',
+          }),
+        );
+        return;
+      }
+
       const reason = !token
         ? 'no-auth-token'
         : !resolvedAstroId
@@ -347,8 +449,13 @@ export function RootNavigator() {
             ? 'app-background'
             : 'disconnect-fallback';
       dispatch(syncSocketSession({ authToken: null, reason }));
-    }
-  }, [token, isAppForeground, astroId, dispatch]);
+    };
+
+    void syncSocketForSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isAppForeground, astroId, dispatch, appState]);
 
   const onOpenStore = () => {
     const url = updateDecision?.storeUrl;
@@ -364,8 +471,11 @@ export function RootNavigator() {
       setIncomingChatOverlay(null);
       void cancelIncomingChatNotifications();
       void clearPendingIncomingChat();
+      void clearIncomingChatPayloadNative();
       void stopIncomingChatNative();
-      void acceptIncomingChatFromPush(dispatch, p);
+      void acceptIncomingChatFromPush(dispatch, p, {
+        skipMainActivityLaunch: true,
+      });
     },
     [dispatch],
   );
@@ -378,6 +488,7 @@ export function RootNavigator() {
       setIncomingChatOverlay(null);
       void cancelIncomingChatNotifications();
       void clearPendingIncomingChat();
+      void clearIncomingChatPayloadNative();
       void stopIncomingChatNative();
       void rejectIncomingChatFromPush(dispatch, p);
     },
@@ -474,7 +585,21 @@ export function RootNavigator() {
           await setPendingIncomingChat(params);
           handledNatively = await startIncomingChatNative(params);
         }
-        if (!handledNatively) {
+        if (params) {
+          void (async () => {
+            await showLocalNotificationFromRemoteMessage(remoteMessage, {
+              skipSound: handledNatively,
+              skipDisplay: false,
+            });
+            if (handledNatively) {
+              try {
+                await notifee.cancelAllNotifications();
+              } catch {
+                /* best-effort — native tray notification stays */
+              }
+            }
+          })();
+        } else {
           void showLocalNotificationFromRemoteMessage(remoteMessage);
         }
       })();
@@ -539,7 +664,8 @@ export function RootNavigator() {
         } as FirebaseMessagingTypes.RemoteMessage,
         canEnterMainApp,
       );
-      if (params) {
+      if (params && !shouldSkipIncomingOverlay(params.roomId)) {
+        void stopIncomingChatNative();
         showIncomingOverlay(params, source);
       }
     };
@@ -575,7 +701,7 @@ export function RootNavigator() {
             }
             await clearPendingIncomingChat();
             if (actionId === 'incoming_chat_accept') {
-              void acceptIncomingChatFromPush(dispatch, params);
+              void acceptIncomingChatFromNotification(dispatch, params);
               return;
             }
             if (canEnterMainApp) {
@@ -656,7 +782,13 @@ export function RootNavigator() {
         if (!p?.roomId || !p.from?.trim()) {
           return;
         }
+        if (isConsultationChatNavigationDone(p.roomId)) {
+          incomingChatAcceptNavigationPendingRef.current = false;
+          void clearPendingIncomingChatAccept();
+          return;
+        }
         if (openConsultationChatScreen(p)) {
+          incomingChatAcceptNavigationPendingRef.current = false;
           void clearPendingIncomingChatAccept();
           return;
         }
@@ -686,6 +818,15 @@ export function RootNavigator() {
         return;
       }
       attempts += 1;
+      const pending = await peekPendingIncomingChatAccept();
+      if (!pending?.roomId) {
+        return;
+      }
+      if (isConsultationChatNavigationDone(pending.roomId)) {
+        incomingChatAcceptNavigationPendingRef.current = false;
+        await clearPendingIncomingChatAccept();
+        return;
+      }
       const done = await flushPendingIncomingChatAccept(dispatch);
       if (!done && !cancelled) {
         setTimeout(() => void tick(), 200);

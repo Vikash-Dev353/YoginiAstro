@@ -8,6 +8,7 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.yoginiastro.incoming.IncomingChatDeviceState
 import com.yoginiastro.incoming.IncomingChatFullScreenActivity
 import com.yoginiastro.incoming.IncomingChatPayloadStore
 import com.yoginiastro.incoming.IncomingChatService
@@ -42,13 +43,13 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-   * User tapped the FCM / Notifee notification — open native Accept/Reject UI
-   * immediately (do not wait for React Native to boot).
+   * Locked: native full-screen Accept/Reject while RN boots.
+   * Unlocked: notification tap → React {@code CustomIncomingNotificationScreen} only.
    */
   private fun maybeLaunchIncomingFullScreen(intent: Intent?) {
     val decision = intent?.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
     if (decision == "accept" || decision == "reject") {
-      /* Notification Answer/Decline — JS opens ConsultationChat via intent probe. */
+      /* Lock-screen notification Answer/Decline — JS handles via intent probe. */
       return
     }
 
@@ -56,6 +57,11 @@ class MainActivity : ReactActivity() {
     val payload = fromIntent ?: IncomingChatPayloadStore.load(this) ?: return
 
     IncomingChatPayloadStore.save(this, payload)
+
+    if (IncomingChatDeviceState.isDeviceUnlocked(this)) {
+      return
+    }
+
     applyIncomingChatWindowFlags()
 
     val fullScreenIntent =

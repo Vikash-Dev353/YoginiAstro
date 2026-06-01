@@ -97,7 +97,11 @@ class IncomingChatService : Service() {
       Log.e(TAG, "[3] startForeground FAILED — likely missing FOREGROUND_SERVICE_PHONE_CALL", e)
     }
 
-    launchIncomingActivity(payload)
+    if (!IncomingChatDeviceState.isDeviceUnlocked(this)) {
+      launchIncomingActivity(payload)
+    } else {
+      Log.d(TAG, "[4] device unlocked — ring in tray; tap opens app overlay")
+    }
   }
 
   private fun handleStop() {
@@ -152,14 +156,40 @@ class IncomingChatService : Service() {
     body: String,
     payload: HashMap<String, String>,
   ): Notification {
-    val launchActivityIntent = fullScreenActivityIntent(payload)
+    val deviceUnlocked = IncomingChatDeviceState.isDeviceUnlocked(this)
+    val tapIntent =
+      if (deviceUnlocked) {
+        mainActivityIntent(payload)
+      } else {
+        fullScreenActivityIntent(payload)
+      }
 
     val contentPI = PendingIntent.getActivity(
       this,
       REQ_CONTENT,
-      launchActivityIntent,
+      tapIntent,
       pendingIntentFlags(),
     )
+
+    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+      .setSmallIcon(R.mipmap.ic_launcher)
+      .setContentTitle(title)
+      .setContentText(body)
+      .setCategory(NotificationCompat.CATEGORY_CALL)
+      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+      .setPriority(NotificationCompat.PRIORITY_MAX)
+      .setOngoing(true)
+      .setAutoCancel(false)
+      .setShowWhen(true)
+      .setOnlyAlertOnce(false)
+      .setContentIntent(contentPI)
+
+    if (deviceUnlocked) {
+      /** Unlocked: tap only → MainActivity → React custom Accept/Reject overlay. */
+      return builder.build()
+    }
+
+    builder.setFullScreenIntent(contentPI, true)
 
     val acceptIntent = actionReceiverIntent(
       IncomingChatActionReceiver.ACTION_ACCEPT,
@@ -176,23 +206,8 @@ class IncomingChatService : Service() {
       this, REQ_REJECT, rejectIntent, pendingIntentFlags(),
     )
 
-    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-      .setSmallIcon(R.mipmap.ic_launcher)
-      .setContentTitle(title)
-      .setContentText(body)
-      .setCategory(NotificationCompat.CATEGORY_CALL)
-      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-      .setPriority(NotificationCompat.PRIORITY_MAX)
-      .setOngoing(true)
-      .setAutoCancel(false)
-      .setShowWhen(true)
-      .setOnlyAlertOnce(false)
-      .setContentIntent(contentPI)
-      .setFullScreenIntent(contentPI, true)
-
     /**
-     * CallStyle (Android 12+) renders proper Decline / Answer buttons — no clipped
-     * custom RemoteViews. Older devices fall back to icon actions.
+     * Locked: CallStyle Decline / Answer (Android 12+) or icon actions.
      */
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       val caller = Person.Builder().setName(title).build()

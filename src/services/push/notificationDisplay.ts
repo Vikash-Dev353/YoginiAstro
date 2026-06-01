@@ -15,7 +15,10 @@ import {
   getIncomingChatParamsFromData,
   getIncomingChatParamsFromRemoteMessage,
 } from './incomingChatFromFcm';
-import { persistIncomingChatPayloadNative } from './incomingChatNative';
+import {
+  isDeviceUnlockedNative,
+  persistIncomingChatPayloadNative,
+} from './incomingChatNative';
 import { setPendingIncomingChat } from './pendingIncomingChat';
 
 /** Matches native `NotificationChannels.SOUND_CHANNEL_ID` + FCM `channel_id: sound_channel`. */
@@ -205,6 +208,9 @@ export async function showLocalNotificationFromRemoteMessage(
         })
       : body;
 
+    const deviceUnlocked =
+      Platform.OS !== 'android' || (await isDeviceUnlockedNative());
+
     await notifee.displayNotification({
       id: remoteMessage.messageId || undefined,
       title: displayTitle,
@@ -228,33 +234,35 @@ export async function showLocalNotificationFromRemoteMessage(
               autoCancel: false,
               showTimestamp: true,
               lights: ['#B77A72', 400, 600],
-              lightUpScreen: true,
+              lightUpScreen: !deviceUnlocked,
               vibrationPattern: RING_VIBRATION_PATTERN,
               /**
-               * Locked-screen wake: Notifee opens MainActivity full-screen
-               * (manifest already sets `showWhenLocked` + `turnScreenOn`).
-               * Once JS boots, RootNavigator consumes the pending payload
-               * stored above and renders the custom Accept/Reject overlay.
+               * Unlocked: tap only → app opens → custom Accept/Reject overlay.
+               * Locked: full-screen wake + tray Answer/Decline actions.
                */
-              fullScreenAction: {
-                id: 'default',
-                launchActivity: 'default',
-              },
-              actions: [
-                {
-                  title: 'Reject',
-                  icon: 'ic_notif_action_reject',
-                  pressAction: { id: 'incoming_chat_decline' },
-                },
-                {
-                  title: 'Accept',
-                  icon: 'ic_notif_action_accept',
-                  pressAction: {
-                    id: 'incoming_chat_accept',
-                    launchActivity: 'default',
-                  },
-                },
-              ],
+              ...(deviceUnlocked
+                ? {}
+                : {
+                    fullScreenAction: {
+                      id: 'default',
+                      launchActivity: 'default',
+                    },
+                    actions: [
+                      {
+                        title: 'Reject',
+                        icon: 'ic_notif_action_reject',
+                        pressAction: { id: 'incoming_chat_decline' },
+                      },
+                      {
+                        title: 'Accept',
+                        icon: 'ic_notif_action_accept',
+                        pressAction: {
+                          id: 'incoming_chat_accept',
+                          launchActivity: 'default',
+                        },
+                      },
+                    ],
+                  }),
             }
           : {}),
       },

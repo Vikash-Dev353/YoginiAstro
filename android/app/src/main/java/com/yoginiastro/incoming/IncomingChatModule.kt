@@ -85,45 +85,129 @@ class IncomingChatModule(
   }
 
   /**
+   * Brings MainActivity to the foreground after Accept from Notifee / headless JS
+   * (notification tray does not use {@link IncomingChatActionReceiver}).
+   */
+  @ReactMethod
+  fun isDeviceUnlocked(promise: Promise) {
+    promise.resolve(IncomingChatDeviceState.isDeviceUnlocked(reactApplicationContext))
+  }
+
+  @ReactMethod
+  fun openMainActivityForAcceptedChat(payload: ReadableMap, promise: Promise) {
+    try {
+      val map = HashMap<String, String>()
+      val it = payload.keySetIterator()
+      while (it.hasNextKey()) {
+        val key = it.nextKey()
+        val value = payload.getString(key)
+        if (value != null) {
+          map[key] = value
+        }
+      }
+      IncomingChatActionHelper.launchMainActivityForAccept(reactApplicationContext, map)
+      promise.resolve(true)
+    } catch (e: Throwable) {
+      promise.reject("INCOMING_CHAT_OPEN_MAIN_FAILED", e)
+    }
+  }
+
+  /**
    * MainActivity may have been launched with the incoming-chat intent extras.
    * JS calls this on mount to consume them and pop the IncomingChatPushOverlay.
    * Returns null if the launch had no chat extras.
    */
   @ReactMethod
+  fun peekLaunchPayload(promise: Promise) {
+    promise.resolve(readLaunchPayloadWritableMap())
+  }
+
+  private fun writableMapFromStore(store: HashMap<String, String>): WritableMap {
+    val map = Arguments.createMap()
+    store.forEach { (k, v) -> map.putString(k, v) }
+    store["incomingChatNotificationDecision"]?.let { decision ->
+      map.putString("incomingChatDecision", decision)
+    }
+    return map
+  }
+
+  @ReactMethod
   fun consumeLaunchPayload(promise: Promise) {
+    val map = readLaunchPayloadWritableMap()
+    if (map == null) {
+      promise.resolve(null)
+      return
+    }
+    val activity = reactApplicationContext.currentActivity
+    val intent = activity?.intent
+    Log.d(
+      TAG,
+      "consumeLaunchPayload: returning payload decision=" +
+        (intent?.getStringExtra("incomingChatDecision") ?: ""),
+    )
+    intent?.removeExtra("incomingChatDecision")
+    if (intent?.action == IncomingChatService.ACTION_INCOMING_CHAT) {
+      intent.action = null
+    }
+    if (activity != null && intent != null) {
+      activity.intent = intent
+    }
+    promise.resolve(map)
+  }
+
+  private fun readLaunchPayloadWritableMap(): WritableMap? {
+    val fromStore = IncomingChatPayloadStore.load(reactApplicationContext)
     val activity = reactApplicationContext.currentActivity
     if (activity == null) {
-      Log.d(TAG, "consumeLaunchPayload: no currentActivity")
-      promise.resolve(null)
-      return
+      return if (fromStore != null && IncomingChatPayloadStore.looksLikeIncomingChat(fromStore)) {
+        writableMapFromStore(fromStore)
+      } else {
+        Log.d(TAG, "readLaunchPayload: no currentActivity")
+        null
+      }
     }
     val intent = activity.intent ?: run {
-      promise.resolve(null)
-      return
+      return if (fromStore != null && IncomingChatPayloadStore.looksLikeIncomingChat(fromStore)) {
+        writableMapFromStore(fromStore)
+      } else {
+        Log.d(TAG, "readLaunchPayload: no intent")
+        null
+      }
     }
-    val decision = intent.getStringExtra("incomingChatDecision")
+    val decision =
+      intent.getStringExtra("incomingChatDecision")
+        ?: intent.getStringExtra("incomingChatNotificationDecision")
+        ?: fromStore?.get("incomingChatNotificationDecision")
     val fromIntent = IncomingChatPayloadStore.readFromIntent(intent)
-    val fromStore = IncomingChatPayloadStore.load(reactApplicationContext)
     val payload = mergePayloadMaps(fromStore, fromIntent)
+    val storeDecision = fromStore?.get("incomingChatNotificationDecision")
     val hasIncoming =
       intent.action == IncomingChatService.ACTION_INCOMING_CHAT ||
         decision != null ||
+        storeDecision != null ||
         payload != null
     if (!hasIncoming) {
-      Log.d(TAG, "consumeLaunchPayload: no incoming-chat intent (action=" +
-        intent.action + ")")
-      promise.resolve(null)
-      return
+      Log.d(TAG, "readLaunchPayload: no incoming-chat intent (action=" + intent.action + ")")
+      return null
     }
     val map = payload ?: Arguments.createMap()
-    if (decision != null) {
-      map.putString("incomingChatDecision", decision)
+    val resolvedDecision = decision ?: storeDecision
+    if (resolvedDecision != null) {
+      map.putString("incomingChatDecision", resolvedDecision)
     }
-    Log.d(TAG, "consumeLaunchPayload: returning payload decision=" + (decision ?: ""))
-    intent.removeExtra("incomingChatDecision")
-    intent.action = null
-    activity.intent = intent
-    promise.resolve(map)
+    return map
+  }
+
+  @ReactMethod
+  fun clearIncomingChatPayload(promise: Promise) {
+    try {
+      IncomingChatPayloadStore.clear(reactApplicationContext)
+      val activity = reactApplicationContext.currentActivity
+      IncomingChatPayloadStore.clearIncomingChatExtrasFromIntent(activity?.intent)
+      promise.resolve(true)
+    } catch (e: Throwable) {
+      promise.reject("INCOMING_CHAT_CLEAR_FAILED", e)
+    }
   }
 
   @ReactMethod
@@ -146,18 +230,12 @@ class IncomingChatModule(
   }
 
   /**
-   * Cold start after notification Accept/Decline — `onNewIntent` can fire before JS
-   * listeners exist. Only replay explicit decisions here; ringing incoming-chat is
-   * handled by `onNewIntent` + the overlay probe (must not stop the foreground service
-   * on every resume or the tray notification disappears before login/bootstrap finishes).
+   * Forwards notification tap + lock-screen Answer/Decline to JS (cold start may miss
+   * `onNewIntent`). Overlay accept/reject clears payload so we do not loop on resume.
    */
   override fun onHostResume() {
     val activity = reactContext.currentActivity ?: return
     val intent = activity.intent ?: return
-    val decision = intent.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
-    if (decision != "accept" && decision != "reject") {
-      return
-    }
     forwardLaunchIntent(intent, "onHostResume")
   }
 
@@ -209,6 +287,18 @@ class IncomingChatModule(
     reactContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       ?.emit(EVENT_INCOMING_CHAT, payload)
+
+    val decisionNorm = decision?.trim()?.lowercase()
+    if (decisionNorm == "accept" || decisionNorm == "reject") {
+      IncomingChatPayloadStore.clear(reactApplicationContext)
+      IncomingChatPayloadStore.clearIncomingChatExtrasFromIntent(intent)
+      intent.removeExtra("incomingChatDecision")
+      intent.removeExtra("incomingChatNotificationDecision")
+      if (intent.action == IncomingChatService.ACTION_INCOMING_CHAT) {
+        intent.action = null
+      }
+      reactContext.currentActivity?.intent = intent
+    }
   }
 
   private fun mergePayloadMaps(

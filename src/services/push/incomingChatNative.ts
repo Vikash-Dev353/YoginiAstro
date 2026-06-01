@@ -22,6 +22,10 @@ type IncomingChatBridge = {
   stopIncomingChat(): Promise<boolean>;
   consumeLaunchPayload(): Promise<Record<string, string> | null>;
   persistIncomingChatPayload(payload: Record<string, string>): Promise<boolean>;
+  openMainActivityForAcceptedChat(payload: Record<string, string>): Promise<boolean>;
+  isDeviceUnlocked(): Promise<boolean>;
+  clearIncomingChatPayload(): Promise<boolean>;
+  peekLaunchPayload(): Promise<Record<string, string> | null>;
 };
 
 const bridge = (NativeModules as { IncomingChat?: IncomingChatBridge })
@@ -119,6 +123,54 @@ export async function startIncomingChatNative(
   }
 }
 
+/** `true` when the phone is not on the lock screen (Android Keyguard). */
+export async function isDeviceUnlockedNative(): Promise<boolean> {
+  const mod = ensureAndroid();
+  if (!mod?.isDeviceUnlocked) {
+    return true;
+  }
+  try {
+    return await mod.isDeviceUnlocked();
+  } catch (error) {
+    fcmTraceError('IncomingChat native: isDeviceUnlocked failed', error);
+    return true;
+  }
+}
+
+/** Lock screen / Notifee Accept — open app so RootNavigator can navigate to chat. */
+export async function openMainActivityForAcceptedChat(
+  params: OrderStackParamList['IncomingChatRequest'],
+): Promise<void> {
+  const mod = ensureAndroid();
+  if (!mod?.openMainActivityForAcceptedChat) {
+    return;
+  }
+  try {
+    const payload = buildNativePayload(params);
+    await mod.openMainActivityForAcceptedChat(payload);
+    fcmTrace(
+      'IncomingChat native: openMainActivityForAcceptedChat OK room=',
+      params.roomId,
+    );
+  } catch (error) {
+    fcmTraceError('IncomingChat native: openMainActivityForAcceptedChat failed', error);
+  }
+}
+
+/** Clears native prefs + MainActivity intent extras so overlay probe cannot replay. */
+export async function clearIncomingChatPayloadNative(): Promise<void> {
+  const mod = ensureAndroid();
+  if (!mod?.clearIncomingChatPayload) {
+    return;
+  }
+  try {
+    await mod.clearIncomingChatPayload();
+    fcmTrace('IncomingChat native: clearIncomingChatPayload OK');
+  } catch (error) {
+    fcmTraceError('IncomingChat native: clearIncomingChatPayload failed', error);
+  }
+}
+
 export async function stopIncomingChatNative(): Promise<void> {
   const mod = ensureAndroid();
   if (!mod) return;
@@ -140,6 +192,25 @@ export async function consumeIncomingChatLaunchParams(): Promise<
 > {
   const consumed = await consumeIncomingChatLaunchAction();
   return consumed.params;
+}
+
+/** Reads launch intent / store without clearing — safe for overlay probe + tap replay. */
+export async function peekIncomingChatLaunchAction(): Promise<IncomingChatLaunchConsume> {
+  const mod = ensureAndroid();
+  if (!mod?.peekLaunchPayload) {
+    return { params: null };
+  }
+  try {
+    const raw = await mod.peekLaunchPayload();
+    if (!raw) {
+      return { params: null };
+    }
+    const flat = flattenNotificationData(raw);
+    return parseIncomingChatLaunchRaw(flat);
+  } catch (error) {
+    fcmTraceError('IncomingChat native: peekLaunchPayload failed', error);
+    return { params: null };
+  }
 }
 
 export async function consumeIncomingChatLaunchAction(): Promise<IncomingChatLaunchConsume> {

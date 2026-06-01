@@ -33,6 +33,54 @@ export function isMainTabNavigationReady(): boolean {
   return routes.some(route => route.name === 'Order');
 }
 
+type NavRoute = {
+  name?: string;
+  params?: { roomId?: string };
+  state?: { routes?: NavRoute[]; index?: number };
+};
+
+function getActiveConsultationChatRoomId(): string | null {
+  if (!navigationRef.isReady()) {
+    return null;
+  }
+  const rootRoutes = navigationRef.getRootState()?.routes ?? [];
+  const orderRoute = rootRoutes.find(route => route.name === 'Order') as
+    | NavRoute
+    | undefined;
+  const stackRoutes = orderRoute?.state?.routes;
+  const stackIndex = orderRoute?.state?.index ?? 0;
+  const active = stackRoutes?.[stackIndex];
+  if (active?.name !== 'ConsultationChat') {
+    return null;
+  }
+  const roomId = active.params?.roomId?.trim();
+  return roomId || null;
+}
+
+/** Avoid repeated `CommonActions.reset` — remounting chat causes leaveRoom/joinRoom loops. */
+export function isAlreadyOnConsultationChat(roomId: string): boolean {
+  const activeRoom = getActiveConsultationChatRoomId();
+  return Boolean(activeRoom && activeRoom === roomId.trim());
+}
+
+const completedConsultationChatRooms = new Set<string>();
+
+export function markConsultationChatNavigationDone(roomId: string): void {
+  const id = roomId.trim();
+  if (!id) {
+    return;
+  }
+  completedConsultationChatRooms.add(id);
+  setTimeout(() => completedConsultationChatRooms.delete(id), 120_000);
+}
+
+export function isConsultationChatNavigationDone(roomId: string): boolean {
+  const id = roomId.trim();
+  return (
+    completedConsultationChatRooms.has(id) || isAlreadyOnConsultationChat(id)
+  );
+}
+
 /**
  * Switch to Order tab and reset its stack to ConsultationChat only
  * (same outcome as IncomingChatRequestScreen `replace`).
@@ -52,6 +100,14 @@ export function openConsultationChatScreen(
   if (!isMainTabNavigationReady()) {
     fcmTrace('openConsultationChatScreen: defer — tabs not mounted room=', p.roomId);
     return false;
+  }
+
+  if (isConsultationChatNavigationDone(p.roomId)) {
+    fcmTrace(
+      'openConsultationChatScreen: skip — already on ConsultationChat room=',
+      p.roomId,
+    );
+    return true;
   }
 
   const chatParams = buildChatScreenParams(p, from);
@@ -85,6 +141,7 @@ export function openConsultationChatScreen(
     }),
   );
 
+  markConsultationChatNavigationDone(p.roomId);
   fcmTrace('openConsultationChatScreen: OK room=', p.roomId);
   return true;
 }
@@ -93,6 +150,9 @@ export function openConsultationChatScreen(
 export function requestConsultationChatNavigation(
   p: ConsultationChatNavParams,
 ): void {
+  if (isConsultationChatNavigationDone(p.roomId)) {
+    return;
+  }
   DeviceEventEmitter.emit(INCOMING_CHAT_OPEN_CONSULTATION_EVENT, p);
   if (openConsultationChatScreen(p)) {
     return;

@@ -21,7 +21,7 @@ import {
   handleIncomingFcm,
 } from './src/services/push/incomingChatFromFcm';
 import {
-  acceptIncomingChatFromPush,
+  acceptIncomingChatFromNotification,
   rejectIncomingChatFromPush,
 } from './src/services/push/incomingChatAcceptFlow';
 import {
@@ -83,7 +83,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   }
   await clearPendingIncomingChat();
   if (actionId === 'incoming_chat_accept') {
-    await acceptIncomingChatFromPush(store.dispatch, params);
+    await acceptIncomingChatFromNotification(store.dispatch, params);
     return;
   }
   const sessionReady = await ensureSessionForIncomingChatDecision();
@@ -169,6 +169,14 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     handledNatively = await startIncomingChatNative(params);
     fcmTrace('BG handler native handled? ', handledNatively);
 
+    /**
+     * Notifee fallback when native service fails. If native is up, cancel the
+     * duplicate so one tray notification remains (tap-only when unlocked).
+     */
+    await showLocalNotificationFromRemoteMessage(remoteMessage, {
+      skipSound: handledNatively,
+      skipDisplay: false,
+    });
     if (handledNatively) {
       try {
         await notifee.cancelAllNotifications();
@@ -176,15 +184,6 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         fcmTraceError('BG handler dismiss duplicate Notifee notification failed', e);
       }
     }
-
-    /**
-     * When native service is running it already shows CallStyle Accept/Reject
-     * (Android 12+) — skip Notifee to avoid duplicate grey action buttons.
-     */
-    await showLocalNotificationFromRemoteMessage(remoteMessage, {
-      skipSound: handledNatively,
-      skipDisplay: handledNatively,
-    });
   } else if (!remoteMessage?.notification) {
     fcmTrace('BG handler → Notifee (non-incoming / data-only)');
     await showLocalNotificationFromRemoteMessage(remoteMessage);
@@ -211,8 +210,7 @@ AppRegistry.registerHeadlessTask(
       return;
     }
     if (decision === 'accept') {
-      await acceptIncomingChatFromPush(store.dispatch, params);
-      await clearPendingIncomingChat();
+      await acceptIncomingChatFromNotification(store.dispatch, params);
       return;
     }
     const sessionReady = await ensureSessionForIncomingChatDecision();

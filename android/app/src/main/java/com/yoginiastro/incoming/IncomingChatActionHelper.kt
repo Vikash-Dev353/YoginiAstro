@@ -21,14 +21,16 @@ object IncomingChatActionHelper {
 
   fun accept(context: Context, sourceIntent: Intent) {
     val payload = resolvePayload(context, sourceIntent)
+    payload["incomingChatNotificationDecision"] = "accept"
+    IncomingChatPayloadStore.save(context, payload)
     IncomingChatService.stop(context)
-    IncomingChatPayloadStore.clear(context)
     dispatch(context, "accept", payload)
     launchMainActivity(context, payload)
   }
 
   fun reject(context: Context, sourceIntent: Intent) {
     val payload = resolvePayload(context, sourceIntent)
+    payload["incomingChatNotificationDecision"] = "reject"
     IncomingChatService.stop(context)
     IncomingChatPayloadStore.clear(context)
     dispatch(context, "reject", payload)
@@ -45,6 +47,10 @@ object IncomingChatActionHelper {
     } catch (_: Throwable) {
       /* OEM may block background service start */
     }
+  }
+
+  fun launchMainActivityForAccept(context: Context, payload: Map<String, String>) {
+    launchMainActivity(context, HashMap(payload))
   }
 
   private fun launchMainActivity(context: Context, payload: HashMap<String, String>) {
