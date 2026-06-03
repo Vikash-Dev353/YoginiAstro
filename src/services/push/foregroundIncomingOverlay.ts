@@ -4,13 +4,23 @@
  */
 export const foregroundIncomingOverlayActiveRef = { current: false };
 
-/** Rooms already accepted/rejected — prevents overlay loop after socket re-emits. */
+/** Rooms already accepted/rejected — prevents overlay loop during one ringing session. */
 const handledIncomingRoomIds = new Set<string>();
+
+/** Last room that showed the incoming overlay — blocks duplicate socket re-fires. */
+export const lastShownIncomingOverlayRoomRef = { current: null as string | null };
 
 export function markIncomingRoomHandled(roomId: string): void {
   const id = roomId?.trim();
   if (id) {
     handledIncomingRoomIds.add(id);
+  }
+}
+
+export function clearIncomingRoomHandled(roomId: string): void {
+  const id = roomId?.trim();
+  if (id) {
+    handledIncomingRoomIds.delete(id);
   }
 }
 

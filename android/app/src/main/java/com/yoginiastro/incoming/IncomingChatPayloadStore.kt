@@ -16,6 +16,15 @@ object IncomingChatPayloadStore {
 
   private val IGNORED_EXTRA_PREFIXES = listOf("google.", "gcm.", "android.", "collapse_key")
 
+  fun hasTerminalDecision(data: Map<String, String>?): Boolean {
+    if (data == null) {
+      return false
+    }
+    val decision =
+      data["incomingChatNotificationDecision"]?.trim()?.lowercase().orEmpty()
+    return decision == "accept" || decision == "reject"
+  }
+
   fun looksLikeIncomingChat(data: Map<String, String>): Boolean {
     val type = data["type"]?.trim()?.lowercase().orEmpty()
     val event = data["event"]?.trim()?.lowercase().orEmpty()

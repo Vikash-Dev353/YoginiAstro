@@ -35,12 +35,23 @@ export function isMainTabNavigationReady(): boolean {
 
 type NavRoute = {
   name?: string;
-  params?: { roomId?: string };
+  params?: { roomId?: string; initialTab?: string };
   state?: { routes?: NavRoute[]; index?: number };
 };
 
-function getActiveConsultationChatRoomId(): string | null {
+/** True only when the Order bottom-tab is the visible tab (not Home dashboard). */
+export function isOrderTabFocused(): boolean {
   if (!navigationRef.isReady()) {
+    return false;
+  }
+  const rootState = navigationRef.getRootState();
+  const index = rootState?.index ?? 0;
+  const current = rootState?.routes[index];
+  return current?.name === 'Order';
+}
+
+function getActiveConsultationChatRoomId(): string | null {
+  if (!navigationRef.isReady() || !isOrderTabFocused()) {
     return null;
   }
   const rootRoutes = navigationRef.getRootState()?.routes ?? [];
@@ -81,6 +92,107 @@ export function isConsultationChatNavigationDone(roomId: string): boolean {
   );
 }
 
+/** Order tab focused and OrderList showing the Waitlist segment. */
+export function isAlreadyOnWaitlistTab(): boolean {
+  if (!navigationRef.isReady() || !isOrderTabFocused()) {
+    return false;
+  }
+  const rootRoutes = navigationRef.getRootState()?.routes ?? [];
+  const orderRoute = rootRoutes.find(route => route.name === 'Order') as
+    | NavRoute
+    | undefined;
+  const stackRoutes = orderRoute?.state?.routes;
+  const stackIndex = orderRoute?.state?.index ?? 0;
+  const active = stackRoutes?.[stackIndex];
+  if (active?.name !== 'OrderList') {
+    return false;
+  }
+  const tab = (active.params as { initialTab?: string } | undefined)?.initialTab;
+  return tab === 'Waitlist' || tab === undefined;
+}
+
+const incomingAcceptNavDoneRooms = new Set<string>();
+
+/** After incoming Accept (all 3 cases) — skip duplicate nav to Waitlist. */
+export function isIncomingAcceptNavigationDone(roomId: string): boolean {
+  const id = roomId.trim();
+  return incomingAcceptNavDoneRooms.has(id) || isAlreadyOnWaitlistTab();
+}
+
+export function markIncomingAcceptNavigationDone(roomId: string): void {
+  const id = roomId.trim();
+  if (!id) {
+    return;
+  }
+  incomingAcceptNavDoneRooms.add(id);
+  setTimeout(() => incomingAcceptNavDoneRooms.delete(id), 120_000);
+}
+
+export function clearIncomingChatNavigationDedupeState(roomId: string): void {
+  const id = roomId.trim();
+  if (!id) {
+    return;
+  }
+  completedConsultationChatRooms.delete(id);
+  incomingAcceptNavDoneRooms.delete(id);
+}
+
+/**
+ * Incoming chat Accept (lock / unlock tap / foreground) → Order → Waitlist tab.
+ */
+export function openWaitlistScreen(): boolean {
+  if (!canEnterMainAppFromAuthState()) {
+    fcmTrace('openWaitlistScreen: defer — main app not ready');
+    return false;
+  }
+  if (!isMainTabNavigationReady()) {
+    fcmTrace('openWaitlistScreen: defer — tabs not mounted');
+    return false;
+  }
+  if (isAlreadyOnWaitlistTab()) {
+    fcmTrace('openWaitlistScreen: skip — already on Waitlist');
+    return true;
+  }
+
+  const rootState = navigationRef.getRootState();
+  if (!rootState?.routes?.length) {
+    return false;
+  }
+
+  const orderIndex = rootState.routes.findIndex(route => route.name === 'Order');
+  if (orderIndex < 0) {
+    return false;
+  }
+
+  const routes = rootState.routes.map(route => {
+    if (route.name !== 'Order') {
+      return { name: route.name as keyof RootTabParamList };
+    }
+    return {
+      name: 'Order' as const,
+      state: {
+        routes: [
+          {
+            name: 'OrderList' as const,
+            params: { initialTab: 'Waitlist' as const },
+          },
+        ],
+        index: 0,
+      },
+    };
+  });
+
+  navigationRef.dispatch(
+    CommonActions.reset({
+      index: orderIndex,
+      routes,
+    }),
+  );
+
+  fcmTrace('openWaitlistScreen: OK');
+  return true;
+}
+
 /**
  * Switch to Order tab and reset its stack to ConsultationChat only
  * (same outcome as IncomingChatRequestScreen `replace`).
@@ -111,35 +223,16 @@ export function openConsultationChatScreen(
   }
 
   const chatParams = buildChatScreenParams(p, from);
-  const rootState = navigationRef.getRootState();
-  if (!rootState?.routes?.length) {
+
+  try {
+    navigationRef.navigate('Order', {
+      screen: 'ConsultationChat',
+      params: chatParams,
+    });
+  } catch (error) {
+    fcmTraceError('openConsultationChatScreen: navigate failed', error);
     return false;
   }
-
-  const orderIndex = rootState.routes.findIndex(route => route.name === 'Order');
-  if (orderIndex < 0) {
-    return false;
-  }
-
-  const routes = rootState.routes.map(route => {
-    if (route.name !== 'Order') {
-      return { name: route.name as keyof RootTabParamList };
-    }
-    return {
-      name: 'Order' as const,
-      state: {
-        routes: [{ name: 'ConsultationChat' as const, params: chatParams }],
-        index: 0,
-      },
-    };
-  });
-
-  navigationRef.dispatch(
-    CommonActions.reset({
-      index: orderIndex,
-      routes,
-    }),
-  );
 
   markConsultationChatNavigationDone(p.roomId);
   fcmTrace('openConsultationChatScreen: OK room=', p.roomId);

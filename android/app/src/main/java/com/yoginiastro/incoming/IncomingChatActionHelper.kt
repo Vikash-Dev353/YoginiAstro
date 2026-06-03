@@ -22,9 +22,13 @@ object IncomingChatActionHelper {
   fun accept(context: Context, sourceIntent: Intent) {
     val payload = resolvePayload(context, sourceIntent)
     payload["incomingChatNotificationDecision"] = "accept"
-    IncomingChatPayloadStore.save(context, payload)
     IncomingChatService.stop(context)
     dispatch(context, "accept", payload)
+    /**
+     * Clear store before MainActivity starts — otherwise {@link MainActivity#onStart}
+     * reloads {@link IncomingChatFullScreenActivity} from stale prefs after Accept.
+     */
+    IncomingChatPayloadStore.clear(context)
     launchMainActivity(context, payload)
   }
 

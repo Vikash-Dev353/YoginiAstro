@@ -233,10 +233,19 @@ class IncomingChatModule(
    * Forwards notification tap + lock-screen Answer/Decline to JS (cold start may miss
    * `onNewIntent`). Overlay accept/reject clears payload so we do not loop on resume.
    */
+  /**
+   * Only forward Accept/Decline on resume. Forwarding every `INCOMING_CHAT` intent here
+   * re-opens the incoming UI after the user already accepted from the lock screen.
+   */
   override fun onHostResume() {
     val activity = reactContext.currentActivity ?: return
     val intent = activity.intent ?: return
-    forwardLaunchIntent(intent, "onHostResume")
+    val decision =
+      intent.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
+        ?: intent.getStringExtra("incomingChatNotificationDecision")?.trim()?.lowercase()
+    if (decision == "accept" || decision == "reject") {
+      forwardLaunchIntent(intent, "onHostResume")
+    }
   }
 
   override fun onHostPause() {

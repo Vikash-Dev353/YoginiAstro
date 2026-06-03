@@ -47,20 +47,19 @@ import {
   getAstrologerFromOnlineResponse,
 } from "../../services/api/astroApi";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { resetIncomingChatSession } from "../../services/push/incomingChatSessionReset";
 import {
   emitStopTyping,
   emitTyping,
-  joinRoom,
   leaveRoom,
-  requestChatHistory,
   resetRoom,
   selectMessages,
   selectSocketState,
   sendMessage,
-  setChatStarted,
   setSocketChatDisconnect,
   setSocketTimerStart,
 } from "../../store/slices/socketSlice";
+import { ensureAstrologerAcceptChatEvents } from "../../services/push/incomingChatAcceptFlow";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "ConsultationChat">;
@@ -247,33 +246,51 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     return () => clearInterval(id);
   }, [remainingSec, socketState.timerStart]);
 
+  const hasLeftRoomRef = useRef(false);
+
+  const endChatSession = useCallback(() => {
+    if (hasLeftRoomRef.current || !roomId) {
+      return;
+    }
+    hasLeftRoomRef.current = true;
+    leaveRoom(roomId);
+    resetIncomingChatSession(roomId);
+    dispatch(resetRoom());
+    dispatch(setSocketTimerStart(false));
+    dispatch(setSocketChatDisconnect(false));
+  }, [dispatch, roomId]);
+
   useEffect(() => {
-    if (!senderId) {
+    if (!senderId || !roomId) {
       return;
     }
     hasShownDisconnectAlertRef.current = false;
-    joinRoom({
-      senderName: "",
-      receiverMobile: senderId,
+    hasLeftRoomRef.current = false;
+    void ensureAstrologerAcceptChatEvents(dispatch, {
+      roomId,
+      from: senderId,
+      customerName,
+      customerImage: customerImage ?? null,
+      kundaliPayload,
     });
-    requestChatHistory(roomId);
-    dispatch(setChatStarted(true));
 
     return () => {
-      leaveRoom(roomId);
-      dispatch(resetRoom());
-      dispatch(setSocketTimerStart(false));
-      dispatch(setSocketChatDisconnect(false));
+      endChatSession();
     };
-  }, [dispatch, roomId, senderId]);
+  }, [
+    customerImage,
+    customerName,
+    dispatch,
+    endChatSession,
+    kundaliPayload,
+    roomId,
+    senderId,
+  ]);
 
   const onEnd = useCallback(() => {
-    leaveRoom(roomId);
-    dispatch(setSocketTimerStart(false));
-    dispatch(setSocketChatDisconnect(false));
-    dispatch(resetRoom());
+    endChatSession();
     navigation.goBack();
-  }, [dispatch, navigation, roomId]);
+  }, [endChatSession, navigation]);
 
   const onConfirmEndChat = useCallback(() => {
     Alert.alert(

@@ -5,7 +5,7 @@ import {
   wasNotificationAcceptHandled,
 } from './incomingChatAcceptFlow';
 import { isIncomingRoomHandled } from './foregroundIncomingOverlay';
-import { isConsultationChatNavigationDone } from './incomingChatNavigation';
+import { isIncomingAcceptNavigationDone } from './incomingChatNavigation';
 import {
   consumeIncomingChatLaunchAction,
   peekIncomingChatLaunchAction,
@@ -80,7 +80,7 @@ export function startIncomingChatOverlayProbe(
         if (
           isIncomingRoomHandled(roomId) ||
           isIncomingChatAcceptInFlight(roomId) ||
-          isConsultationChatNavigationDone(roomId) ||
+          isIncomingAcceptNavigationDone(roomId) ||
           (wasNotificationAcceptHandled(roomId) && launch.decision !== 'accept')
         ) {
           fcmTrace('incomingChatOverlayProbe: skip replay room=', roomId);

@@ -424,13 +424,20 @@ export const requestChatHistory = (roomId: string) => {
   socket.emit("chat-history", { roomId });
 };
 
-export const acceptChat = (params: { from: string; roomId: string }) => (dispatch: AppDispatch) => {
-  const socket = getSocket();
-  if (!socket) return;
-  socket.emit("accept-chat", { from: params.from, roomId: params.roomId });
-  requestChatHistory(params.roomId);
-  dispatch(removeChatRequest(params.roomId));
-};
+export const acceptChat =
+  (params: { from: string; roomId: string }) => (dispatch: AppDispatch) => {
+    const socket = getSocket();
+    if (!socket) {
+      return;
+    }
+    const userId = params.from.trim();
+    const roomId = params.roomId.trim();
+    const payload = { from: userId, userId, roomId };
+    socket.emit("accept-chat", payload);
+    socketDebugLog("accept-chat emitted", payload);
+    requestChatHistory(roomId);
+    dispatch(removeChatRequest(roomId));
+  };
 
 export const rejectChat = (params: { from: string; roomId: string }) => (dispatch: AppDispatch) => {
   const socket = getSocket();
@@ -440,11 +447,13 @@ export const rejectChat = (params: { from: string; roomId: string }) => (dispatc
 };
 
 export const leaveRoom = (roomId: string) => {
-  console.log("leaveRoom==>>>>", roomId);
   const socket = getSocket();
-  if (!socket || !roomId) return;
-  socket.emit("leave-room", { roomId });
-  console.log("leaveRoom==>>>>", roomId);
+  if (!socket || !roomId) {
+    return;
+  }
+  const id = roomId.trim();
+  socket.emit("leave-room", { roomId: id });
+  socketDebugLog("leave-room emitted", { roomId: id });
 };
 
 export const emitTyping = (roomId: string) => {

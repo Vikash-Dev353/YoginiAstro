@@ -47,14 +47,19 @@ class MainActivity : ReactActivity() {
    * Unlocked: notification tap → React {@code CustomIncomingNotificationScreen} only.
    */
   private fun maybeLaunchIncomingFullScreen(intent: Intent?) {
-    val decision = intent?.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
-    if (decision == "accept" || decision == "reject") {
-      /* Lock-screen notification Answer/Decline — JS handles via intent probe. */
+    val intentDecision = intent?.getStringExtra("incomingChatDecision")?.trim()?.lowercase()
+    if (intentDecision == "accept" || intentDecision == "reject") {
+      /* Accept/Decline already chosen — JS opens ConsultationChat, not this UI again. */
+      return
+    }
+
+    val storePayload = IncomingChatPayloadStore.load(this)
+    if (IncomingChatPayloadStore.hasTerminalDecision(storePayload)) {
       return
     }
 
     val fromIntent = IncomingChatPayloadStore.readFromIntent(intent)
-    val payload = fromIntent ?: IncomingChatPayloadStore.load(this) ?: return
+    val payload = fromIntent ?: storePayload ?: return
 
     IncomingChatPayloadStore.save(this, payload)
 
