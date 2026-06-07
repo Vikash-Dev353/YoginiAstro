@@ -46,6 +46,7 @@ import { OrderStackParamList } from "../../navigation/types";
 import {
   astroApi,
   getAstrologerFromOnlineResponse,
+  normalizeAstroProfileFromApi,
 } from "../../services/api/astroApi";
 import { store } from "../../store";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -55,13 +56,19 @@ import {
   emitTyping,
   leaveRoom,
   resetRoom,
+  selectChatRequests,
   selectMessages,
   selectSocketState,
   sendMessage,
+  setAstroChatData,
   setSocketChatDisconnect,
   setSocketTimerStart,
 } from "../../store/slices/socketSlice";
 import { ensureAstrologerAcceptChatEvents } from "../../services/push/incomingChatAcceptFlow";
+import {
+  coerceBillingNumber,
+  computeChatRemainingSeconds,
+} from "../../utils/chatBilling";
 import { hp, normalizeFont, wp } from "../../utils/responsive";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "ConsultationChat">;
@@ -197,17 +204,32 @@ function getAttachmentKind(params: {
 }
 
 function ConsultationChatScreenComponent({ navigation, route }: Props) {
-  const { customerName, roomId, senderId, kundaliPayload, customerImage } =
-    route.params;
+  const {
+    customerName,
+    roomId,
+    senderId,
+    kundaliPayload,
+    customerImage,
+    userBalance: routeUserBalance,
+    astroPrice: routeAstroPrice,
+  } = route.params;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const socketState = useAppSelector(selectSocketState);
   const socketMessages = useAppSelector(selectMessages);
+  const chatRequests = useAppSelector(selectChatRequests);
   const token = useAppSelector((state) => state.auth.token);
   const astroId = useAppSelector((state) => state.auth.astroId);
 
   const [remainingSec, setRemainingSec] = useState(0);
+  const [sessionBilling, setSessionBilling] = useState<{
+    balance?: number;
+    pricePerMinute?: number;
+  }>({
+    balance: coerceBillingNumber(routeUserBalance),
+    pricePerMinute: coerceBillingNumber(routeAstroPrice),
+  });
   const [draft, setDraft] = useState("");
   const [isSendingAttachment, setIsSendingAttachment] = useState(false);
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
@@ -222,32 +244,171 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const audioRecorderRef = useRef(new AudioRecorderPlayer());
   const previousMessageCountRef = useRef(0);
 
-  const initialRemainingSec = useMemo(() => {
-    const chatData = socketState.astroChatData as
-      | { userBalance?: number; astroPrice?: number }
-      | null;
-    const balance = Number(chatData?.userBalance ?? 0);
-    const pricePerMinute = Number(chatData?.astroPrice ?? 0);
-    if (!Number.isFinite(balance) || !Number.isFinite(pricePerMinute) || pricePerMinute <= 0) {
-      return 0;
-    }
-    return Math.max(0, Math.floor((balance / pricePerMinute) * 60));
-  }, [socketState.astroChatData]);
+  const chatRequestForRoom = useMemo(
+    () => chatRequests.find((request) => request.roomId?.trim() === roomId.trim()),
+    [chatRequests, roomId],
+  );
+
+  const resolvedBilling = useMemo(() => {
+    const chatData = socketState.astroChatData as Record<string, unknown> | null;
+    const roomData = socketState.roomData as Record<string, unknown> | null;
+    const requestRecord = chatRequestForRoom as Record<string, unknown> | undefined;
+    const balance =
+      coerceBillingNumber(chatData?.userBalance) ??
+      sessionBilling.balance ??
+      coerceBillingNumber(routeUserBalance) ??
+      coerceBillingNumber(roomData?.userBalance) ??
+      coerceBillingNumber(roomData?.balance) ??
+      coerceBillingNumber(requestRecord?.balance) ??
+      coerceBillingNumber(requestRecord?.userBalance);
+    const pricePerMinute =
+      coerceBillingNumber(chatData?.astroPrice) ??
+      sessionBilling.pricePerMinute ??
+      coerceBillingNumber(routeAstroPrice) ??
+      coerceBillingNumber(roomData?.astroPrice) ??
+      coerceBillingNumber(roomData?.price) ??
+      coerceBillingNumber(roomData?.astroData) ??
+      coerceBillingNumber(requestRecord?.astroData) ??
+      coerceBillingNumber(requestRecord?.astroPrice);
+    return { balance, pricePerMinute };
+  }, [
+    chatRequestForRoom,
+    routeAstroPrice,
+    routeUserBalance,
+    sessionBilling.balance,
+    sessionBilling.pricePerMinute,
+    socketState.astroChatData,
+    socketState.roomData,
+  ]);
 
   useEffect(() => {
-    setRemainingSec(initialRemainingSec);
-  }, [initialRemainingSec, roomId]);
+    const balance = resolvedBilling.balance;
+    const pricePerMinute = resolvedBilling.pricePerMinute;
+    if (!balance && !pricePerMinute) {
+      return;
+    }
+    setSessionBilling((prev) => ({
+      balance: balance ?? prev.balance,
+      pricePerMinute: pricePerMinute ?? prev.pricePerMinute,
+    }));
+  }, [resolvedBilling.balance, resolvedBilling.pricePerMinute]);
+
+  const initialRemainingSec = useMemo(
+    () =>
+      computeChatRemainingSeconds(
+        resolvedBilling.balance,
+        resolvedBilling.pricePerMinute,
+      ),
+    [resolvedBilling.balance, resolvedBilling.pricePerMinute],
+  );
+
+  const effectiveRemainingSec =
+    remainingSec > 0 ? remainingSec : initialRemainingSec;
+  const displayTimerSec = socketState.timerStart
+    ? effectiveRemainingSec
+    : initialRemainingSec;
+
+  useEffect(() => {
+    if (!socketState.timerStart || initialRemainingSec <= 0) {
+      return;
+    }
+    setRemainingSec((prev) =>
+      prev > 0 && prev <= initialRemainingSec ? prev : initialRemainingSec,
+    );
+  }, [initialRemainingSec, socketState.timerStart]);
+
+  useEffect(() => {
+    if (!astroId?.trim() || !roomId.trim()) {
+      return;
+    }
+    let active = true;
+    const syncBillingFromApis = async () => {
+      let balance = resolvedBilling.balance;
+      let pricePerMinute = resolvedBilling.pricePerMinute;
+
+      if (!pricePerMinute) {
+        try {
+          const profileRes = await astroApi.getProfile({ astroId: astroId.trim() });
+          const rawProfile =
+            profileRes.astrologer ??
+            profileRes.profile ??
+            profileRes.data ??
+            profileRes.result;
+          if (rawProfile && typeof rawProfile === "object") {
+            const profile = normalizeAstroProfileFromApi(
+              rawProfile as Record<string, unknown>,
+            );
+            pricePerMinute = coerceBillingNumber(profile.price);
+          }
+        } catch {
+          /* profile price optional */
+        }
+      }
+
+      if (!balance) {
+        try {
+          const waitlist = await astroApi.getWaitlist(astroId.trim(), {
+            forceRefresh: true,
+          });
+          const entry = (waitlist.waitingList ?? []).find(
+            (item) => item.roomId?.trim() === roomId.trim(),
+          );
+          balance = coerceBillingNumber(entry?.balance);
+          pricePerMinute ??=
+            coerceBillingNumber(entry?.astroData) ??
+            coerceBillingNumber(
+              (entry as Record<string, unknown> | undefined)?.astroPrice,
+            );
+        } catch {
+          /* waitlist balance optional */
+        }
+      }
+
+      if (!active || (!balance && !pricePerMinute)) {
+        return;
+      }
+
+      const prev = (store.getState().socket.astroChatData ??
+        {}) as Record<string, unknown>;
+      dispatch(
+        setAstroChatData({
+          ...prev,
+          roomId,
+          ...(balance ? { userBalance: balance } : {}),
+          ...(pricePerMinute ? { astroPrice: pricePerMinute } : {}),
+        }),
+      );
+    };
+
+    void syncBillingFromApis();
+    return () => {
+      active = false;
+    };
+  }, [
+    astroId,
+    dispatch,
+    resolvedBilling.balance,
+    resolvedBilling.pricePerMinute,
+    roomId,
+  ]);
 
   useEffect(() => {
     const shouldRunCountdown = socketState.timerStart;
-    if (!shouldRunCountdown || remainingSec <= 0) {
+    if (!shouldRunCountdown || initialRemainingSec <= 0) {
       return;
     }
+    setRemainingSec((prev) => (prev > 0 ? prev : initialRemainingSec));
     const id = setInterval(() => {
       setRemainingSec((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(id);
-  }, [remainingSec, socketState.timerStart]);
+  }, [
+    initialRemainingSec,
+    resolvedBilling.balance,
+    resolvedBilling.pricePerMinute,
+    roomId,
+    socketState.timerStart,
+  ]);
 
   const hasLeftRoomRef = useRef(false);
 
@@ -271,12 +432,17 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     }
     hasLeftRoomRef.current = false;
     lastHandledPeerLeftSeqRef.current = store.getState().socket.peerLeftSeq;
+    const chatData = store.getState().socket.astroChatData as
+      | { userBalance?: number; astroPrice?: number }
+      | null;
     void ensureAstrologerAcceptChatEvents(dispatch, {
       roomId,
       from: senderId,
       customerName,
       customerImage: customerImage ?? null,
       kundaliPayload,
+      userBalance: routeUserBalance ?? chatData?.userBalance,
+      astroPrice: routeAstroPrice ?? chatData?.astroPrice,
     });
 
     return () => {
@@ -288,6 +454,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     dispatch,
     kundaliPayload,
     roomId,
+    routeAstroPrice,
+    routeUserBalance,
     senderId,
   ]);
 
@@ -909,7 +1077,7 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
               {customerName}
             </Text>
             <Text style={styles.headerTimer}>
-              {formatSessionClock(remainingSec)}
+              {formatSessionClock(displayTimerSec)}
             </Text>
           </View>
         </View>

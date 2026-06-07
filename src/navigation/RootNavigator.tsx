@@ -339,7 +339,9 @@ export function RootNavigator() {
       }
       fcmTrace('RootNavigator: deferred accept intent room=', launch.params.roomId);
       setIncomingChatOverlay(null);
-      void acceptIncomingChatFromNotification(dispatch, launch.params);
+      void acceptIncomingChatFromNotification(dispatch, launch.params, {
+        navigateTarget: 'chat',
+      });
     })();
   }, [
     canEnterMainApp,
@@ -376,7 +378,9 @@ export function RootNavigator() {
           fcmTrace('RootNavigator: probe → accept → ConsultationChat');
           foregroundIncomingOverlayActiveRef.current = false;
           setIncomingChatOverlay(null);
-          void acceptIncomingChatFromNotification(dispatch, launch.params);
+          void acceptIncomingChatFromNotification(dispatch, launch.params, {
+            navigateTarget: 'chat',
+          });
           return;
         }
         if (launch.decision === 'reject') {
@@ -422,7 +426,9 @@ export function RootNavigator() {
       if (launch.decision === 'accept') {
         foregroundIncomingOverlayActiveRef.current = false;
         setIncomingChatOverlay(null);
-        void acceptIncomingChatFromNotification(dispatch, launch.params);
+        void acceptIncomingChatFromNotification(dispatch, launch.params, {
+          navigateTarget: 'chat',
+        });
         return;
       }
       if (launch.decision === 'reject') {
@@ -769,7 +775,9 @@ export function RootNavigator() {
             }
             await clearPendingIncomingChat();
             if (actionId === 'incoming_chat_accept') {
-              void acceptIncomingChatFromNotification(dispatch, params);
+              void acceptIncomingChatFromNotification(dispatch, params, {
+                navigateTarget: 'chat',
+              });
               return;
             }
             if (canEnterMainApp) {
@@ -844,18 +852,18 @@ export function RootNavigator() {
       INCOMING_CHAT_OPEN_CONSULTATION_EVENT,
       (p: OrderStackParamList['IncomingChatRequest']) => {
         fcmTrace(
-          'RootNavigator: accept → Waitlist event room=',
+          'RootNavigator: accept → ConsultationChat event room=',
           p?.roomId ?? '(none)',
         );
         if (!p?.roomId) {
           return;
         }
-        if (isIncomingAcceptNavigationDone(p.roomId)) {
+        if (isConsultationChatNavigationDone(p.roomId)) {
           incomingChatAcceptNavigationPendingRef.current = false;
           void clearPendingIncomingChatAccept();
           return;
         }
-        if (openWaitlistScreen()) {
+        if (openConsultationChatScreen(p)) {
           incomingChatAcceptNavigationPendingRef.current = false;
           void clearPendingIncomingChatAccept();
           return;

@@ -83,7 +83,9 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   }
   await clearPendingIncomingChat();
   if (actionId === 'incoming_chat_accept') {
-    await acceptIncomingChatFromNotification(store.dispatch, params);
+    await acceptIncomingChatFromNotification(store.dispatch, params, {
+      navigateTarget: 'chat',
+    });
     return;
   }
   const sessionReady = await ensureSessionForIncomingChatDecision();
@@ -210,7 +212,9 @@ AppRegistry.registerHeadlessTask(
       return;
     }
     if (decision === 'accept') {
-      await acceptIncomingChatFromNotification(store.dispatch, params);
+      await acceptIncomingChatFromNotification(store.dispatch, params, {
+        navigateTarget: 'chat',
+      });
       return;
     }
     const sessionReady = await ensureSessionForIncomingChatDecision();

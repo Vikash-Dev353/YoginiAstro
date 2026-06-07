@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { AppDispatch, RootState } from "../index";
 import { decodeAstroIdFromToken } from "./authSlice";
 import { getSocket, syncSocketWithSession } from "../../services/socket";
+import { coerceBillingNumber } from "../../utils/chatBilling";
 
 const SOCKET_DEBUG = __DEV__;
 
@@ -272,13 +273,78 @@ function normalizeChatRequestsPayload(payload: unknown): ChatRequestItem[] {
   return [];
 }
 
+function mergeBillingFromSocketPayload(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  payload: Record<string, unknown> | undefined,
+): void {
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+  const nested =
+    payload.data && typeof payload.data === "object"
+      ? (payload.data as Record<string, unknown>)
+      : null;
+  const userBalance =
+    coerceBillingNumber(payload.userBalance) ??
+    coerceBillingNumber(payload.balance) ??
+    coerceBillingNumber(nested?.userBalance) ??
+    coerceBillingNumber(nested?.balance);
+  const astroPrice =
+    coerceBillingNumber(payload.astroPrice) ??
+    coerceBillingNumber(payload.price) ??
+    coerceBillingNumber(payload.astroData) ??
+    coerceBillingNumber(nested?.astroPrice) ??
+    coerceBillingNumber(nested?.price) ??
+    coerceBillingNumber(nested?.astroData);
+  const hasBalance = userBalance != null;
+  const hasPrice = astroPrice != null;
+  if (!hasBalance && !hasPrice) {
+    return;
+  }
+  const prev = getState().socket.astroChatData as Record<string, unknown> | null;
+  if (!prev) {
+    return;
+  }
+  dispatch(
+    socketSlice.actions.setAstroChatData({
+      ...prev,
+      ...(hasBalance ? { userBalance } : {}),
+      ...(hasPrice ? { astroPrice } : {}),
+    }),
+  );
+}
+
+function payloadSignalsUserAccepted(
+  payload: Record<string, unknown> | undefined,
+): boolean {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  const nested =
+    payload.data && typeof payload.data === "object"
+      ? (payload.data as Record<string, unknown>)
+      : {};
+  const merged = { ...nested, ...payload };
+  if (
+    merged.userAccepted === true ||
+    merged.userJoined === true ||
+    merged.bothJoined === true ||
+    merged.sessionStarted === true
+  ) {
+    return true;
+  }
+  const status = String(merged.status ?? merged.roomStatus ?? "").toLowerCase();
+  return status === "active" || status === "started" || status === "live";
+}
+
 export const syncSocketSession =
   (params: {
     authToken: string | null;
     astroId?: string | null;
     reason?: string;
   }) =>
-  (dispatch: AppDispatch) => {
+  (dispatch: AppDispatch, getState: () => RootState) => {
     const { authToken, astroId, reason } = params;
     socketDebugLog("syncSocketSession called", {
       hasToken: Boolean(authToken),
@@ -342,12 +408,31 @@ export const syncSocketSession =
       });
     });
 
+    const handleUserAcceptedChat = (
+      _eventName: string,
+      payload?: Record<string, unknown>,
+    ) => {
+      if (getState().socket.timerStart) {
+        mergeBillingFromSocketPayload(dispatch, getState, payload);
+        return;
+      }
+      mergeBillingFromSocketPayload(dispatch, getState, payload);
+      dispatch(setTimerStart(true));
+    };
+
     socket.on("private-message", (msg: SocketMessage) => {
       dispatch(messageReceived(msg));
+      if (msg.sender && msg.sender !== "astrologer") {
+        handleUserAcceptedChat("private-message", msg as Record<string, unknown>);
+      }
     });
 
     socket.on("room-ready", (data: Record<string, unknown>) => {
       dispatch(roomReadyEvent(data));
+      mergeBillingFromSocketPayload(dispatch, getState, data);
+      if (payloadSignalsUserAccepted(data)) {
+        handleUserAcceptedChat("room-ready", data);
+      }
     });
 
     socket.on("chat-history", (history: unknown) => {
@@ -380,8 +465,26 @@ export const syncSocketSession =
       dispatch(peerLeftEvent());
     });
 
-    socket.on("start-timer", () => {
-      dispatch(setTimerStart(true));
+    socket.on("start-timer", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("start-timer", payload);
+    });
+    socket.on("startTimer", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("startTimer", payload);
+    });
+    socket.on("timer-started", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("timer-started", payload);
+    });
+    socket.on("user-accepted", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("user-accepted", payload);
+    });
+    socket.on("user-accepted-chat", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("user-accepted-chat", payload);
+    });
+    socket.on("user-joined", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("user-joined", payload);
+    });
+    socket.on("chat-accepted-by-user", (payload?: Record<string, unknown>) => {
+      handleUserAcceptedChat("chat-accepted-by-user", payload);
     });
 
     socket.on(
@@ -394,6 +497,10 @@ export const syncSocketSession =
 
     socket.on("typing", (data: Record<string, unknown>) => {
       dispatch(setTyping(data));
+      const sender = String(data.sender ?? data.userId ?? "");
+      if (sender && sender !== "astrologer") {
+        handleUserAcceptedChat("typing", data);
+      }
     });
 
     socket.on("stop-typing", () => {

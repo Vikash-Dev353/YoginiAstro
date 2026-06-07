@@ -45,6 +45,8 @@ export type OrderStackParamList = {
     senderId?: string;
     kundaliPayload?: GenerateKundaliPayload;
     customerImage?: string | null;
+    userBalance?: number;
+    astroPrice?: number;
   };
   AttachmentViewer: {
     uri: string;

@@ -8,6 +8,7 @@ import {
   parseKundliUrlToPayload,
   type GenerateKundaliPayload,
 } from '../api/astroApi';
+import { coerceBillingNumber } from '../../utils/chatBilling';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
   resolveIncomingChatBody,
@@ -343,8 +344,12 @@ export function getIncomingChatParamsFromChatRequestItem(
       customerImage: item.userData?.profileImage ?? item.senderImage,
       kundliUrl: item.kundliUrl,
       subtitle: item.subtitle,
-      userBalance: item.balance?.balance,
-      astroPrice: item.astroData?.price,
+      userBalance:
+        coerceBillingNumber(item.balance) ??
+        coerceBillingNumber((item as Record<string, unknown>).userBalance),
+      astroPrice:
+        coerceBillingNumber(item.astroData) ??
+        coerceBillingNumber((item as Record<string, unknown>).astroPrice),
     }),
   } as FirebaseMessagingTypes.RemoteMessage);
 }

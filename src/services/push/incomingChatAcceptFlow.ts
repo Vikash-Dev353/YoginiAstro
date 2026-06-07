@@ -15,6 +15,11 @@ import { getIncomingChatParamsFromChatRequestItem } from './incomingChatFromFcm'
 import { store } from '../../store';
 import { ensureSessionForIncomingChatDecision } from './ensureSessionForIncomingChatDecision';
 import { markIncomingRoomHandled } from './foregroundIncomingOverlay';
+import {
+  astroApi,
+  normalizeAstroProfileFromApi,
+} from '../api/astroApi';
+import { coerceBillingNumber } from '../../utils/chatBilling';
 import { fcmTrace, fcmTraceError } from './fcmDebug';
 import {
   isConsultationChatNavigationDone,
@@ -23,6 +28,7 @@ import {
   markIncomingAcceptNavigationDone,
   openConsultationChatScreen,
   openWaitlistScreen,
+  requestConsultationChatNavigation,
 } from './incomingChatNavigation';
 import { cancelIncomingChatNotifications } from './notificationDisplay';
 import {
@@ -68,8 +74,8 @@ export type AcceptIncomingChatOptions = {
   /** Native notification / MainActivity already opened the app — do not startActivity again. */
   skipMainActivityLaunch?: boolean;
   /**
-   * `chat` — app foreground / socket overlay (case 3).
-   * `waitlist` — lock screen or notification tap (cases 1 & 2).
+   * `chat` — open ConsultationChat (foreground overlay + notification accept).
+   * `waitlist` — legacy; only pass explicitly when Waitlist is required.
    */
   navigateTarget?: AcceptNavigateTarget;
 };
@@ -83,7 +89,7 @@ function resolveAcceptNavigateTarget(
   return (
     options?.navigateTarget ??
     pendingAcceptNavigateTargetByRoom.get(roomId.trim()) ??
-    'waitlist'
+    'chat'
   );
 }
 
@@ -193,6 +199,82 @@ async function tryEmitAstrologerJoinedChatEvents(
   return true;
 }
 
+/** Resolve user balance + chat rate before accept — waitlist still has the row here. */
+export async function hydrateIncomingChatBilling(
+  p: OrderStackParamList['IncomingChatRequest'],
+): Promise<OrderStackParamList['IncomingChatRequest']> {
+  const roomId = p.roomId?.trim();
+  if (!roomId) {
+    return p;
+  }
+
+  let balance = coerceBillingNumber(p.userBalance);
+  let price = coerceBillingNumber(p.astroPrice);
+
+  const chatData = store.getState().socket.astroChatData as
+    | Record<string, unknown>
+    | null;
+  balance ??= coerceBillingNumber(chatData?.userBalance);
+  price ??= coerceBillingNumber(chatData?.astroPrice);
+
+  const request = store.getState().socket.chatRequests.find(
+    (item) => item.roomId?.trim() === roomId,
+  );
+  balance ??= coerceBillingNumber(request?.balance);
+  price ??=
+    coerceBillingNumber(request?.astroData) ??
+    coerceBillingNumber(
+      (request as Record<string, unknown> | undefined)?.astroPrice,
+    );
+
+  const astroId = store.getState().auth.astroId?.trim();
+  if (astroId) {
+    if (!price) {
+      try {
+        const profileRes = await astroApi.getProfile({ astroId });
+        const rawProfile =
+          profileRes.astrologer ??
+          profileRes.profile ??
+          profileRes.data ??
+          profileRes.result;
+        if (rawProfile && typeof rawProfile === 'object') {
+          price = coerceBillingNumber(
+            normalizeAstroProfileFromApi(
+              rawProfile as Record<string, unknown>,
+            ).price,
+          );
+        }
+      } catch {
+        /* optional */
+      }
+    }
+    if (!balance || !price) {
+      try {
+        const waitlist = await astroApi.getWaitlist(astroId, {
+          forceRefresh: true,
+        });
+        const entry = (waitlist.waitingList ?? []).find(
+          (item) => item.roomId?.trim() === roomId,
+        );
+        balance ??= coerceBillingNumber(entry?.balance);
+        price ??=
+          coerceBillingNumber(entry?.astroData) ??
+          coerceBillingNumber(
+            (entry as Record<string, unknown> | undefined)?.astroPrice,
+          );
+      } catch {
+        /* optional */
+      }
+    }
+  }
+
+  return {
+    ...p,
+    userBalance: balance,
+    astroPrice: price,
+  };
+}
+
 function applyAstroChatDataForAccept(
   dispatch: AppDispatch,
   p: OrderStackParamList['IncomingChatRequest'],
@@ -201,6 +283,10 @@ function applyAstroChatDataForAccept(
   if (!from || !p.roomId) {
     return;
   }
+  const prev = store.getState().socket.astroChatData as Record<
+    string,
+    unknown
+  > | null;
   dispatch(setSocketChatDisconnect(false));
   dispatch(
     setAstroChatData({
@@ -209,8 +295,12 @@ function applyAstroChatDataForAccept(
       userImage: p.customerImage ?? undefined,
       roomId: p.roomId,
       kundliUrl: p.kundliUrl,
-      userBalance: p.userBalance,
-      astroPrice: p.astroPrice,
+      userBalance:
+        coerceBillingNumber(p.userBalance) ??
+        coerceBillingNumber(prev?.userBalance),
+      astroPrice:
+        coerceBillingNumber(p.astroPrice) ??
+        coerceBillingNumber(prev?.astroPrice),
     }),
   );
 }
@@ -224,8 +314,9 @@ export async function ensureAstrologerAcceptChatEvents(
   p: OrderStackParamList['IncomingChatRequest'],
   options?: EnsureAstrologerAcceptChatEventsOptions,
 ): Promise<boolean> {
-  const from = p.from?.trim();
-  const roomId = p.roomId?.trim();
+  const latest = resolveLatestIncomingChatParams(p);
+  const from = latest.from?.trim();
+  const roomId = latest.roomId?.trim();
   if (!from || !roomId) {
     fcmTraceError('ensureAstrologerAcceptChatEvents: missing from or roomId');
     return false;
@@ -243,7 +334,8 @@ export async function ensureAstrologerAcceptChatEvents(
     return false;
   }
 
-  applyAstroChatDataForAccept(dispatch, p);
+  const enriched = await hydrateIncomingChatBilling(latest);
+  applyAstroChatDataForAccept(dispatch, enriched);
 
   const maxAttempts = 50;
   const delayMs = 150;
@@ -253,7 +345,7 @@ export async function ensureAstrologerAcceptChatEvents(
         dispatch,
         from,
         roomId,
-        p.customerName,
+        enriched.customerName,
         options,
       )
     ) {
@@ -294,9 +386,10 @@ function isAcceptNavigationDone(
 
 function tryNavigateAfterAccept(
   p: OrderStackParamList['IncomingChatRequest'],
-  target: AcceptNavigateTarget = 'waitlist',
+  target: AcceptNavigateTarget = 'chat',
 ): void {
-  const roomId = p.roomId.trim();
+  const latest = resolveLatestIncomingChatParams(p);
+  const roomId = latest.roomId.trim();
   if (isAcceptNavigationDone(roomId, target)) {
     finishAcceptNavigation(roomId);
     clearAcceptNavigateTarget(roomId);
@@ -307,14 +400,14 @@ function tryNavigateAfterAccept(
   pendingAcceptNavigateTargetByRoom.set(roomId, target);
 
   if (target === 'chat') {
-    if (openConsultationChatScreen(p)) {
-      markConsultationChatNavigationDone(roomId);
+    requestConsultationChatNavigation(latest);
+    if (isConsultationChatNavigationDone(roomId)) {
       finishAcceptNavigation(roomId);
       clearAcceptNavigateTarget(roomId);
       fcmTrace('tryNavigateAfterAccept: ConsultationChat OK room=', roomId);
       return;
     }
-    navigateToChatAfterAccept(p);
+    navigateToChatAfterAccept(latest);
     return;
   }
 
@@ -331,7 +424,8 @@ function tryNavigateAfterAccept(
 export function navigateToChatAfterAccept(
   p: OrderStackParamList['IncomingChatRequest'],
 ): void {
-  const roomId = p.roomId.trim();
+  const latest = resolveLatestIncomingChatParams(p);
+  const roomId = latest.roomId.trim();
   pendingAcceptNavigateTargetByRoom.set(roomId, 'chat');
   if (isConsultationChatNavigationDone(roomId)) {
     finishAcceptNavigation(roomId);
@@ -357,7 +451,8 @@ export function navigateToChatAfterAccept(
     }
 
     attempts += 1;
-    if (openConsultationChatScreen(p)) {
+    requestConsultationChatNavigation(latest);
+    if (openConsultationChatScreen(latest)) {
       markConsultationChatNavigationDone(roomId);
       fcmTrace('navigateToChatAfterAccept OK room=', roomId, 'attempt=', attempts);
       finishAcceptNavigation(roomId);
@@ -369,7 +464,7 @@ export function navigateToChatAfterAccept(
       return;
     }
     fcmTrace('navigateToChatAfterAccept deferred room=', roomId);
-    void setPendingIncomingChatAccept(p);
+    void setPendingIncomingChatAccept(latest);
   };
   tryNav();
 }
@@ -441,20 +536,33 @@ export async function acceptIncomingChatFromNotification(
   p: OrderStackParamList['IncomingChatRequest'],
   options?: AcceptIncomingChatOptions,
 ): Promise<void> {
-  const roomId = p.roomId?.trim();
+  const latest = resolveLatestIncomingChatParams(p);
+  const roomId = latest.roomId?.trim();
   if (!roomId) {
     return;
   }
 
+  const navigateTarget = resolveAcceptNavigateTarget(roomId, {
+    ...options,
+    navigateTarget: options?.navigateTarget ?? 'chat',
+  });
+  pendingAcceptNavigateTargetByRoom.set(roomId, navigateTarget);
+  await setPendingIncomingChatAccept(latest);
+  markAcceptNavigationPending(true);
+
   if (wasNotificationAcceptHandled(roomId)) {
     if (!wereAstrologerAcceptChatEventsEmitted(roomId)) {
       fcmTrace('acceptIncomingChatFromNotification: retry accept-chat room=', roomId);
-      void ensureAstrologerAcceptChatEvents(dispatch, p, { force: true });
+      void ensureAstrologerAcceptChatEvents(dispatch, latest, { force: true });
     }
-    const target = resolveAcceptNavigateTarget(roomId, options);
-    if (!isAcceptNavigationDone(roomId, target)) {
-      fcmTrace('acceptIncomingChatFromNotification: retry nav room=', roomId, 'target=', target);
-      tryNavigateAfterAccept(p, target);
+    if (!isAcceptNavigationDone(roomId, navigateTarget)) {
+      fcmTrace(
+        'acceptIncomingChatFromNotification: retry nav room=',
+        roomId,
+        'target=',
+        navigateTarget,
+      );
+      tryNavigateAfterAccept(latest, navigateTarget);
     } else {
       finishAcceptNavigation(roomId);
     }
@@ -462,16 +570,15 @@ export async function acceptIncomingChatFromNotification(
   }
   markNotificationAcceptHandled(roomId);
   markIncomingRoomHandled(roomId);
-  markAcceptNavigationPending(true);
 
   void cancelIncomingChatNotifications();
   void stopIncomingChatNative();
   void clearIncomingChatPayloadNative();
   void clearPendingIncomingChat();
 
-  await acceptIncomingChatFromPush(dispatch, p, {
+  await acceptIncomingChatFromPush(dispatch, latest, {
     skipMainActivityLaunch: options?.skipMainActivityLaunch ?? true,
-    navigateTarget: options?.navigateTarget ?? 'waitlist',
+    navigateTarget,
   });
 }
 
@@ -480,8 +587,9 @@ export async function acceptIncomingChatFromPush(
   p: OrderStackParamList['IncomingChatRequest'],
   options?: AcceptIncomingChatOptions,
 ): Promise<void> {
-  const from = p.from?.trim();
-  const roomId = p.roomId?.trim();
+  const latest = resolveLatestIncomingChatParams(p);
+  const from = latest.from?.trim();
+  const roomId = latest.roomId?.trim();
   if (!from || !roomId) {
     fcmTraceError('acceptIncomingChatFromPush: missing from or roomId');
     return;
@@ -494,7 +602,7 @@ export async function acceptIncomingChatFromPush(
     finishAcceptNavigation(roomId);
     clearAcceptNavigateTarget(roomId);
     if (!wereAstrologerAcceptChatEventsEmitted(roomId)) {
-      void ensureAstrologerAcceptChatEvents(dispatch, p, { force: true });
+      void ensureAstrologerAcceptChatEvents(dispatch, latest, { force: true });
     }
     fcmTrace('acceptIncomingChatFromPush: skip nav room=', roomId, 'target=', navigateTarget);
     return;
@@ -507,12 +615,12 @@ export async function acceptIncomingChatFromPush(
       'acceptIncomingChatFromPush: in flight — retry events/nav room=',
       roomId,
     );
-    void ensureAstrologerAcceptChatEvents(dispatch, p, { force: true });
-    tryNavigateAfterAccept(p, navigateTarget);
+    void ensureAstrologerAcceptChatEvents(dispatch, latest, { force: true });
+    tryNavigateAfterAccept(latest, navigateTarget);
     return;
   }
 
-  await setPendingIncomingChatAccept(p);
+  await setPendingIncomingChatAccept(latest);
   markAcceptNavigationPending(true);
 
   if (
@@ -522,12 +630,14 @@ export async function acceptIncomingChatFromPush(
   ) {
     mainActivityLaunchedForAcceptRoom.add(roomId);
     setTimeout(() => mainActivityLaunchedForAcceptRoom.delete(roomId), 60_000);
-    await openMainActivityForAcceptedChat(p);
+    await openMainActivityForAcceptedChat(latest);
   }
   acceptFlowInFlightForRoom.add(roomId);
 
   try {
-    const applied = await applyIncomingChatAccept(dispatch, p, { force: true });
+    const applied = await applyIncomingChatAccept(dispatch, latest, {
+      force: true,
+    });
     if (!applied) {
       fcmTrace(
         'acceptIncomingChatFromPush: accept deferred (session) room=',
@@ -535,7 +645,7 @@ export async function acceptIncomingChatFromPush(
       );
     }
 
-    tryNavigateAfterAccept(p, navigateTarget);
+    tryNavigateAfterAccept(latest, navigateTarget);
   } finally {
     acceptFlowInFlightForRoom.delete(roomId);
   }
@@ -550,7 +660,8 @@ export async function flushPendingIncomingChatAccept(
     return false;
   }
 
-  const roomId = pending.roomId.trim();
+  const latest = resolveLatestIncomingChatParams(pending);
+  const roomId = latest.roomId.trim();
   const target = resolveAcceptNavigateTarget(roomId);
 
   if (isAcceptNavigationDone(roomId, target)) {
@@ -563,7 +674,7 @@ export async function flushPendingIncomingChatAccept(
   fcmTrace('flushPendingIncomingChatAccept room=', roomId, 'target=', target);
 
   if (!wereAstrologerAcceptChatEventsEmitted(roomId)) {
-    const applied = await ensureAstrologerAcceptChatEvents(dispatch, pending, {
+    const applied = await ensureAstrologerAcceptChatEvents(dispatch, latest, {
       force: true,
     });
     if (!applied) {
@@ -572,7 +683,8 @@ export async function flushPendingIncomingChatAccept(
   }
 
   if (target === 'chat') {
-    if (!openConsultationChatScreen(pending)) {
+    requestConsultationChatNavigation(latest);
+    if (!openConsultationChatScreen(latest)) {
       fcmTrace('flushPendingIncomingChatAccept: chat nav deferred room=', roomId);
       return false;
     }

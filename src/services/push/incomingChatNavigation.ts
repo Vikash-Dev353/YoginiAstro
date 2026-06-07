@@ -21,6 +21,8 @@ function buildChatScreenParams(
     senderId: from,
     kundaliPayload: p.kundaliPayload,
     customerImage: p.customerImage ?? undefined,
+    userBalance: p.userBalance,
+    astroPrice: p.astroPrice,
   };
 }
 

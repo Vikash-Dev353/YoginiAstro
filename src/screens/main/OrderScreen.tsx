@@ -29,6 +29,7 @@ import {
 } from "../../services/api/astroApi";
 import { decodeAstroIdFromToken } from "../../store/slices/authSlice";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { hydrateIncomingChatBilling } from "../../services/push/incomingChatAcceptFlow";
 import {
   acceptChat,
   rejectChat,
@@ -507,34 +508,47 @@ export function OrderScreen({ route, navigation }: Props) {
             <Pressable
               style={[styles.actionButton, styles.acceptButton]}
               onPress={() => {
-                console.log("waitlistItem==>>>>", waitlistItem);
-                if (waitlistItem.from && waitlistItem.id) {
+                void (async () => {
+                  if (!waitlistItem.from || !waitlistItem.id) {
+                    return;
+                  }
+                  const billing = await hydrateIncomingChatBilling({
+                    roomId: waitlistItem.id,
+                    from: waitlistItem.from,
+                    customerName: waitlistItem.name,
+                    customerImage: waitlistItem.profileImage ?? null,
+                    kundliUrl: waitlistItem.kundliUrl,
+                    userBalance: waitlistItem.userBalance,
+                    astroPrice: waitlistItem.astroPrice,
+                  });
                   dispatch(setSocketChatDisconnect(false));
                   dispatch(
                     setAstroChatData({
-                      from: waitlistItem?.from,
-                      senderName: waitlistItem?.name,
-                      userImage: waitlistItem?.profileImage,
-                      roomId: waitlistItem?.id,
-                      kundliUrl: waitlistItem?.kundliUrl,
-                      userBalance: waitlistItem?.userBalance,
-                      astroPrice: waitlistItem?.astroPrice,
-                    })
+                      from: billing.from ?? waitlistItem.from,
+                      senderName: waitlistItem.name,
+                      userImage: waitlistItem.profileImage,
+                      roomId: waitlistItem.id,
+                      kundliUrl: waitlistItem.kundliUrl,
+                      userBalance: billing.userBalance,
+                      astroPrice: billing.astroPrice,
+                    }),
                   );
                   dispatch(
                     acceptChat({
-                      from: waitlistItem?.from,
-                      roomId: waitlistItem?.id,
-                    })
+                      from: waitlistItem.from,
+                      roomId: waitlistItem.id,
+                    }),
                   );
-                }
-                navigation.navigate("ConsultationChat", {
-                  customerName: waitlistItem?.name,
-                  roomId: waitlistItem?.id,
-                  senderId: waitlistItem?.from,
-                  kundaliPayload: waitlistItem?.generateKundaliPayload,
-                  customerImage: waitlistItem?.profileImage,
-                });
+                  navigation.navigate("ConsultationChat", {
+                    customerName: waitlistItem.name,
+                    roomId: waitlistItem.id,
+                    senderId: waitlistItem.from,
+                    kundaliPayload: waitlistItem.generateKundaliPayload,
+                    customerImage: waitlistItem.profileImage,
+                    userBalance: billing.userBalance,
+                    astroPrice: billing.astroPrice,
+                  });
+                })();
               }}
             >
               <Text style={styles.actionButtonText}>{t("common.accept")}</Text>
