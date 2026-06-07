@@ -1,3 +1,4 @@
+import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   memo,
@@ -46,6 +47,7 @@ import {
   astroApi,
   getAstrologerFromOnlineResponse,
 } from "../../services/api/astroApi";
+import { store } from "../../store";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { resetIncomingChatSession } from "../../services/push/incomingChatSessionReset";
 import {
@@ -214,7 +216,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const [recordingSec, setRecordingSec] = useState(0);
   const [playSendSound, setPlaySendSound] = useState(false);
   const [playReceiveSound, setPlayReceiveSound] = useState(false);
-  const hasShownDisconnectAlertRef = useRef(false);
+  const lastHandledPeerLeftSeqRef = useRef(0);
+  const endChatSessionRef = useRef<() => void>(() => undefined);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const audioRecorderRef = useRef(new AudioRecorderPlayer());
   const previousMessageCountRef = useRef(0);
@@ -249,6 +252,8 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
   const hasLeftRoomRef = useRef(false);
 
   const endChatSession = useCallback(() => {
+    dispatch(setSocketChatDisconnect(false));
+    dispatch(setSocketTimerStart(false));
     if (hasLeftRoomRef.current || !roomId) {
       return;
     }
@@ -256,16 +261,16 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     leaveRoom(roomId);
     resetIncomingChatSession(roomId);
     dispatch(resetRoom());
-    dispatch(setSocketTimerStart(false));
-    dispatch(setSocketChatDisconnect(false));
   }, [dispatch, roomId]);
+
+  endChatSessionRef.current = endChatSession;
 
   useEffect(() => {
     if (!senderId || !roomId) {
       return;
     }
-    hasShownDisconnectAlertRef.current = false;
     hasLeftRoomRef.current = false;
+    lastHandledPeerLeftSeqRef.current = store.getState().socket.peerLeftSeq;
     void ensureAstrologerAcceptChatEvents(dispatch, {
       roomId,
       from: senderId,
@@ -275,13 +280,12 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     });
 
     return () => {
-      endChatSession();
+      endChatSessionRef.current();
     };
   }, [
     customerImage,
     customerName,
     dispatch,
-    endChatSession,
     kundaliPayload,
     roomId,
     senderId,
@@ -686,23 +690,29 @@ function ConsultationChatScreenComponent({ navigation, route }: Props) {
     };
   }, [isRecordingAudio]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const peerLeftSeqAtFocus = store.getState().socket.peerLeftSeq;
+      hasLeftRoomRef.current = false;
+      lastHandledPeerLeftSeqRef.current = peerLeftSeqAtFocus;
+      dispatch(setSocketChatDisconnect(false));
+    }, [dispatch, roomId]),
+  );
+
   useEffect(() => {
-    if (hasShownDisconnectAlertRef.current) {
+    const peerLeftSeq = socketState.peerLeftSeq;
+    if (peerLeftSeq <= lastHandledPeerLeftSeqRef.current) {
       return;
     }
 
-    if (socketState.chatDisconnect) {
-      hasShownDisconnectAlertRef.current = true;
-      Alert.alert(
-        "Chat Disconnected",
-        "The user has left the chat.",
-        [{ text: "OK", onPress: onEnd }],
-        { cancelable: false }
-      );
-      return;
-    }
-
-  }, [onEnd, socketState.chatDisconnect]);
+    lastHandledPeerLeftSeqRef.current = peerLeftSeq;
+    Alert.alert(
+      "Chat Disconnected",
+      "The user has left the chat.",
+      [{ text: "OK", onPress: onEnd }],
+      { cancelable: false }
+    );
+  }, [onEnd, roomId, socketState.peerLeftSeq]);
 
   useEffect(() => {
     const resolvedAstroId = astroId?.trim();

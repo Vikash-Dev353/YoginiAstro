@@ -60,6 +60,8 @@ type SocketState = {
   chatStarted: boolean;
   astroChatData: Record<string, unknown> | null;
   chatDisconnect: boolean;
+  /** Increments on every peer-left so UI can react to repeat disconnects. */
+  peerLeftSeq: number;
   chatRequests: ChatRequestItem[];
   timerStart: boolean;
   waitlistCount: number;
@@ -78,6 +80,7 @@ const initialState: SocketState = {
   chatStarted: false,
   astroChatData: null,
   chatDisconnect: false,
+  peerLeftSeq: 0,
   chatRequests: [],
   timerStart: false,
   waitlistCount: 0,
@@ -120,6 +123,7 @@ const socketSlice = createSlice({
       state.chatStarted = false;
       state.userFree = null;
       state.timerStart = false;
+      state.chatDisconnect = false;
     },
     setChatStarted: (state, action: PayloadAction<boolean>) => {
       state.chatStarted = action.payload;
@@ -134,6 +138,10 @@ const socketSlice = createSlice({
     },
     setChatDisconnect: (state, action: PayloadAction<boolean>) => {
       state.chatDisconnect = action.payload;
+    },
+    peerLeftEvent: (state) => {
+      state.peerLeftSeq += 1;
+      state.chatDisconnect = true;
     },
     setTimerStart: (state, action: PayloadAction<boolean>) => {
       state.timerStart = action.payload;
@@ -190,6 +198,7 @@ const {
   setChatRequests,
   removeChatRequest,
   setChatDisconnect,
+  peerLeftEvent,
   setTimerStart,
   setWaitlistCount,
   setTyping,
@@ -368,12 +377,10 @@ export const syncSocketSession =
     });
 
     socket.on("peer-left", () => {
-      dispatch(setChatDisconnect(true));
+      dispatch(peerLeftEvent());
     });
 
     socket.on("start-timer", () => {
-
-      console.log("start-timer==>>>>");
       dispatch(setTimerStart(true));
     });
 
