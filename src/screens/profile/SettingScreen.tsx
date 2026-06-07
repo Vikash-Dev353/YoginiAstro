@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/common/AppButton';
 import { AppHeader } from '../../components/common/AppHeader';
@@ -17,13 +17,12 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'Setting'>;
 export function SettingScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const fallbackTabBarHeight = 72;
   const effectiveTabBarHeight =
     tabBarHeight > 0 ? tabBarHeight : fallbackTabBarHeight;
-  const footerBottom = effectiveTabBarHeight + insets.bottom + 8;
-  const footerEstimatedHeight = 56;
+  const scrollBottomPadding = effectiveTabBarHeight + insets.bottom + 24;
   const settingItems = [
     { key: 'pay-slip', title: t('profile.paySlip'), iconLabel: 'MP' },
     { key: 'download-form', title: t('profile.downloadForm'), iconLabel: 'D' },
@@ -89,11 +88,14 @@ export function SettingScreen({ navigation, route }: Props) {
       <AppHeader title={t('common.setting')} showBack onBackPress={onBackPress} />
 
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: footerBottom + footerEstimatedHeight + 20 },
+          { paddingBottom: scrollBottomPadding },
         ]}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+        bounces
       >
         {settingItems.map(item => (
           <SettingListItem
@@ -103,11 +105,12 @@ export function SettingScreen({ navigation, route }: Props) {
             onPress={() => onItemPress(item.key)}
           />
         ))}
+        <AppButton
+          title={t('profile.clearDataLogout')}
+          onPress={onLogoutPress}
+          containerStyle={styles.logoutButton}
+        />
       </ScrollView>
-
-       <View style={[styles.footer, { bottom: footerBottom }]}>
-        <AppButton title={t('profile.clearDataLogout')} onPress={onLogoutPress} />
-      </View> 
     </SafeAreaView>
   );
 }
@@ -117,16 +120,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: wp(4.5),
     paddingTop: hp(2),
   },
-  footer: {
-    position: 'absolute',
-    left: wp(4.5),
-    right: wp(4.5),
-    bottom: 30,
-    zIndex: 20,
-    elevation: 20,
+  logoutButton: {
+    marginTop: hp(1),
   },
 });

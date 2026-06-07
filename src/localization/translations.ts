@@ -85,9 +85,9 @@ export const translations = {
       registerSuccessBody: 'Your phone number has been verified successfully.',
       completeProfileButton: 'Complete profile',
       returnToLoginLink: 'Return to login',
-      pendingApprovalTitle: 'Awaiting admin approval',
+      pendingApprovalTitle: 'Registration Submitted Successfully',
       pendingApprovalBody:
-        'Your profile details are submitted. You will have full access after an admin approves your account.',
+        "Thank you for registering as an astrologer. Your profile has been submitted for review and is currently awaiting admin approval. Once approved, you'll gain full access to your account and can start offering consultations.",
       pendingApprovalRefresh: 'Check status',
     },
     profile: {
@@ -292,9 +292,9 @@ export const translations = {
       registerSuccessBody: 'आपका फोन नंबर सफलतापूर्वक सत्यापित हो गया है।',
       completeProfileButton: 'प्रोफाइल पूरी करें',
       returnToLoginLink: 'लॉगिन पर वापस जाएं',
-      pendingApprovalTitle: 'एडमिन की मंज़ूरी लंबित',
+      pendingApprovalTitle: 'पंजीकरण सफलतापूर्वक जमा हो गया',
       pendingApprovalBody:
-        'आपकी प्रोफाइल जमा हो गई है। एडमिन द्वारा स्वीकृति के बाद ही पूरी पहुंच मिलेगी।',
+        'ज्योतिषी के रूप में पंजीकरण करने के लिए धन्यवाद। आपकी प्रोफाइल समीक्षा के लिए जमा कर दी गई है और वर्तमान में एडमिन की मंज़ूरी की प्रतीक्षा में है। स्वीकृति मिलने के बाद, आपको अपने खाते तक पूरी पहुंच मिलेगी और आप परामर्श देना शुरू कर सकेंगे।',
       pendingApprovalRefresh: 'स्थिति जाँचें',
     },
     profile: {

@@ -1058,6 +1058,7 @@ function CompleteProfileScreenComponent({ navigation, route }: Props) {
           'CompleteProfile'
         >['navigation'];
         authNavigation.replace('PendingApproval');
+        return;
       }
       Alert.alert(
         success ? t('completeProfile.submitTitle') : 'Update failed',

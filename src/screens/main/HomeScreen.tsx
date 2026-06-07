@@ -305,6 +305,10 @@ function HomeScreenComponent({ navigation }: Props) {
     navigation.navigate("Support");
   };
 
+  const openWallet = () => {
+    navigation.navigate("Wallet");
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
       <View style={[styles.headerWrap]}>
@@ -398,26 +402,25 @@ function HomeScreenComponent({ navigation }: Props) {
           </View>
         </View>
 
-        <View style={styles.earningCard}>
+        <Pressable style={styles.earningCard} onPress={openWallet}>
           <View style={styles.earningRow}>
             <View>
               <Text style={styles.earningTitle}>{earningTitleText}</Text>
             </View>
-            <Pressable style={styles.arrowButton}>
-              
+            <View style={styles.arrowButton}>
               <Image
                 source={images.makiArrow}
                 style={styles.arrowImage}
                 resizeMode="contain"
               />
-            </Pressable>
+            </View>
           </View>
-           <View style={styles.earningFooter}>
+          <View style={styles.earningFooter}>
             <Text style={styles.earningFooterText}>
               {t("home.invoiceHint")}
             </Text>
-          </View> 
-        </View>
+          </View>
+        </Pressable>
 
         <View style={styles.grid}>
           {actions.map((item) => (
